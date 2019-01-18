@@ -1,4 +1,4 @@
-import {html, IoElement} from "../classes/element.js";
+import {html, IoElement} from "../io-core.js";
 
 const selection = window.getSelection();
 const range = document.createRange();
@@ -10,10 +10,17 @@ export class IoNumber extends IoElement {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        border: 1px solid #444;
+        border-radius: 2px;
+        padding: 0 0.25em;
+        background: white;
       }
       :host:focus {
         overflow: hidden;
         text-overflow: clip;
+        outline: none;
+        border-color: #09d;
+        background: #def;
       }
     </style>`;
   }
