@@ -1,5 +1,4 @@
-import {html, storage} from "../io-core.js";
-import {IoObject} from "./object.js";
+import {IoElement, html, storage} from "../io-core.js";
 
 import "./inspector-breadcrumbs.js";
 import "./inspector-link.js";
@@ -9,37 +8,41 @@ function isValueOfPropertyOf(prop, object) {
   return null;
 }
 
-export class IoInspector extends IoObject {
+export class IoInspector extends IoElement {
   static get style() {
     return html`<style>
     :host {
-      padding: 2px;
-      background-color: #666;
-      border-color: #444;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid #444;
+      border-radius: 3px;
+      padding: 1px;
+      background-color: #fff;
     }
-    :host > io-inspector-breadcrumbs {
-      margin-bottom: 2px;
+    :host > .io-inspector-header {
+
     }
-    :host > io-object {
-      padding: 1px !important;
+    :host > io-collapsable {
+      padding: 2px !important;
+      margin: 2px;
       font-size: 0.9em;
       background-color: #ccc !important;
     }
-    :host > io-object > io-boolean {
+    :host > io-collapsable > div > io-boolean {
       display: block;
       padding-bottom: 0.15em;
     }
-    :host > io-object > io-properties {
+    :host > io-collapsable > div > io-properties {
       padding: 0 !important;
     }
-    :host > io-object > io-properties > div {
+    :host > io-collapsable > div > io-properties > div {
       overflow: hidden;
       padding: 2px;
     }
-    :host > io-object > io-properties > div:not(:last-of-type) {
+    :host > io-collapsable > div > io-properties > div:not(:last-of-type) {
       border-bottom: 1px solid rgba(0, 0, 0, 0.125);
     }
-    :host > io-object > io-properties > div > :nth-child(1) {
+    :host > io-collapsable > div > io-properties > div > :nth-child(1) {
       overflow: hidden;
       text-overflow: ellipsis;
       text-align: right;
@@ -47,20 +50,24 @@ export class IoInspector extends IoObject {
       padding-left: 0.5em;
       min-width: 3em;
     }
-    :host > io-object > io-properties > div > :nth-child(2) {
+    :host > io-collapsable > div > io-properties > div > :nth-child(2) {
       flex: 1 0 8em;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
       min-width: 2em;
     }
-    :host > io-object > io-properties > div > io-option {
+    :host > io-collapsable > div > io-properties > div > io-option {
       flex: 0 1 auto !important;
     }
     </style>`;
   }
   static get properties() {
     return {
+      value: Object,
+      props: Array,
+      config: null,
+      labeled: true,
       crumbs: Array,
       groups: Object,
       _groups: Object,
@@ -79,7 +86,7 @@ export class IoInspector extends IoObject {
   }
   valueChanged() {
     // super.valueChanged();
-    this._groups = this.__proto__.__groups.getGroups(this.value, this.groups);
+    this._groups = this.__proto__.__config.getConfig(this.value, this.groups);
     let crumb = this.crumbs.find((crumb) => { return crumb === this.value; });
     let lastrumb = this.crumbs[this.crumbs.length - 1];
     if (crumb) {
@@ -91,33 +98,35 @@ export class IoInspector extends IoObject {
     this.crumbs = [...this.crumbs];
   }
   groupsChanged() {
-    this._groups = this.__proto__.__groups.getGroups(this.value, this.groups);
+    this._groups = this.__proto__.__config.getConfig(this.value, this.groups);
   }
   changed() {
-    const elements = [['io-inspector-breadcrumbs', {crumbs: this.crumbs}]];
+    const elements = [
+      ['io-inspector-breadcrumbs', {crumbs: this.crumbs}],
+      // TODO: add search
+    ];
     // TODO: rewise and document use of storage
     // const id = this.value.guid || this.value.uuid || this.value.id;
     for (let group in this._groups) {
-      const expanded = storage('io-inspector-group-' + this.value.constructor.name + '-' + group, false);
       elements.push(
-        ['io-object', {
-          value: this.value,
+        ['io-collapsable', {
           label: group,
-          expanded: expanded,
-          props: this._groups[group],
-          config: this.constructor.config,
+          expanded: storage('io-inspector-group-' + this.value.constructor.name + '-' + group, false),
+          elements: [
+            ['io-properties', {
+              value: this.value,
+              props: this._groups[group],
+              config: {'type:object': ['io-inspector-link']},
+              labeled: true,
+            }]
+          ]
         }],
       );
     }
     this.template(elements);
   }
+
   static get config() {
-    return {
-      'type:object': ['io-inspector-link'],
-      'type:boolean': ['io-boolean', {true: '⦿ true', false: '⦾ false'}],
-    };
-  }
-  static get groups() {
     return {
       'Object|hidden': [/^_/],
       'HTMLElement|hidden': [/^_/, 'innerText', 'outerText', 'innerHTML', 'outerHTML', 'textContent'],
@@ -125,16 +134,19 @@ export class IoInspector extends IoObject {
   }
 }
 
-export class Groups {
+export class Config {
   constructor(prototypes) {
     for (let i = 0; i < prototypes.length; i++) {
-      const groups = prototypes[i].constructor.groups || {};
-      for (let g in groups) {
-        this[g] = [...(this[g] || []), ...groups[g]];
-      }
+      this.registerConfig(prototypes[i].constructor.config || {});
     }
   }
-  getGroups(object, customGroups) {
+  registerConfig(config) {
+    for (let g in config) {
+      this[g] = this[g] || [];
+      this[g] = [...this[g], ...config[g]];
+    }
+  }
+  getConfig(object, customGroups) {
     const keys = Object.keys(object);
     const prototypes = [];
 
@@ -201,8 +213,11 @@ export class Groups {
 }
 
 IoInspector.Register = function() {
-  IoObject.Register.call(this);
-  Object.defineProperty(this.prototype, '__groups', {value: new Groups(this.prototype.__protochain)});
+  IoElement.Register.call(this);
+  Object.defineProperty(this.prototype, '__config', {value: new Config(this.prototype.__protochain)});
 };
 
 IoInspector.Register();
+IoInspector.RegisterConfig = function(config) {
+  this.prototype.__config.registerConfig(config);
+};

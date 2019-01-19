@@ -94,7 +94,6 @@ export class IoProperties extends IoElement {
       'type:object': ['io-object', {}],
       'type:null': ['io-string', {}],
       'type:undefined': ['io-string', {}],
-      'Array|type:number': ['io-slider', {step: 0.05, min:0, max:10}],
     };
   }
 }
@@ -102,11 +101,13 @@ export class IoProperties extends IoElement {
 export class Config {
   constructor(prototypes) {
     for (let i = 0; i < prototypes.length; i++) {
-      const config = prototypes[i].constructor.config || {};
-      for (let c in config) {
-        this[c] = this[c] || [];
-        this[c] = [config[c][0] || this[c][0], Object.assign(this[c][1] || {}, config[c][1] || {})];
-      }
+      this.registerConfig(prototypes[i].constructor.config || {});
+    }
+  }
+  registerConfig(config) {
+    for (let c in config) {
+      this[c] = this[c] || [];
+      this[c] = [config[c][0] || this[c][0], Object.assign(this[c][1] || {}, config[c][1] || {})];
     }
   }
   getConfig(object, customConfig) {
@@ -165,3 +166,6 @@ IoProperties.Register = function() {
 };
 
 IoProperties.Register();
+IoProperties.RegisterConfig = function(config) {
+  this.prototype.__config.registerConfig(config);
+};
