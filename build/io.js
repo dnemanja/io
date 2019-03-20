@@ -389,149 +389,153 @@ class Queue extends Array {
   }
 }
 
-// TODO: Documentation and tests
+// TODO: Improve documentation and tests
 
-const IoCoreMixin = (superclass) => class extends superclass {
-  static get properties() {
-    return {};
-  }
-  get bindings() {
-    return;
-  }
-  constructor(initProps = {}) {
-    super(initProps);
-
-    if (!this.constructor.prototype.__registered) this.constructor.Register();
-
-    Object.defineProperty(this, '__queue', {value: new Queue(this)});
-    Object.defineProperty(this, '__bindings', {value: new Bindings(this)});
-    Object.defineProperty(this, '__properties', {value: this.__properties.clone(this)});
-    Object.defineProperty(this, '__listeners', {value: this.__listeners.clone(this)});
-
-    for (let i = 0; i < this.__functions.length; i++) {
-      this[this.__functions[i]] = this[this.__functions[i]].bind(this);
+const IoCoreMixin = (superclass) => {
+  const classConstructor = class extends superclass {
+    static get properties() {
+      return {};
     }
-
-    this.__listeners.setPropListeners(initProps, this);
-
-    // TODO: test and documentation
-    if (this.compose) this.applyCompose(this.compose);
-
-    this.setProperties(initProps);
-  }
-  connect(instance) {
-    this._instances = this._instances || [];
-    if (this._instances.indexOf(instance) === -1) {
-      this._instances.push(instance);
-      if (!this.__connected) this.connectedCallback();
+    get bindings() {
+      return;
     }
-  }
-  disconnect(instance) {
-    if (this._instances.indexOf(instance) !== -1) {
-      this._instances.splice(this._instances.indexOf(instance), 1);
-    }
-    if (this._instances.length === 0 && this.__connected) {
-      this.disconnectedCallback();
-    }
-  }
-  preventDefault(event) {
-    event.preventDefault();
-  }
-  changed() {}
-  bind(prop) {
-    return this.__bindings.get(prop);
-  }
-  set(prop, value) {
-    if (this[prop] !== value) {
-      const oldValue = this[prop];
-      this[prop] = value;
-      this.dispatchEvent(prop + '-set', {property: prop, value: value, oldValue: oldValue}, false);
-    }
-  }
-  setProperties(props) {
-    for (let p in props) {
-      if (this.__properties[p] === undefined) continue;
-      const oldValue = this.__properties[p].value;
-      this.__properties.set(p, props[p]);
-      const value = this.__properties[p].value;
-      if (value !== oldValue) this.queue(p, value, oldValue);
-    }
+    constructor(initProps = {}) {
+      super(initProps);
 
-    this.className = props['className'] || '';
+      if (!this.constructor.prototype.__registered) this.constructor.Register();
 
-    if (props['style']) {
-      for (let s in props['style']) {
-        this.style[s] = props['style'][s];
-        this.style.setProperty(s, props['style'][s]);
+      Object.defineProperty(this, '__queue', {value: new Queue(this)});
+      Object.defineProperty(this, '__bindings', {value: new Bindings(this)});
+      Object.defineProperty(this, '__properties', {value: this.__properties.clone(this)});
+      Object.defineProperty(this, '__listeners', {value: this.__listeners.clone(this)});
+
+      for (let i = 0; i < this.__functions.length; i++) {
+        this[this.__functions[i]] = this[this.__functions[i]].bind(this);
+      }
+
+      this.__listeners.setPropListeners(initProps, this);
+
+      // TODO: test and documentation
+      if (this.compose) this.applyCompose(this.compose);
+
+      this.setProperties(initProps);
+    }
+    connect(instance) {
+      this._instances = this._instances || [];
+      if (this._instances.indexOf(instance) === -1) {
+        this._instances.push(instance);
+        if (!this.__connected) this.connectedCallback();
       }
     }
-    // TODO: consider postpoining dispatch for unconnected elements.
-    // if (this.__connected) this.queueDispatch();
-    this.queueDispatch();
-  }
-  // TODO: test extensively
-  applyCompose(nodes) {
-    for (let n in nodes) {
-      const properties = nodes[n];
-      this[n].setProperties(properties);
-      this.addEventListener(n + '-changed', (event) => {
-        if (event.detail.oldValue) event.detail.oldValue.dispose(); // TODO: test
-        event.detail.value.setProperties(properties);
-      });
-    }
-  }
-  onObjectMutation(event) {
-    for (let i = this.__objectProps.length; i--;) {
-      const prop = this.__objectProps[i];
-      const value = this.__properties[prop].value;
-      if (value === event.detail.object) {
-        if (this[prop + 'Mutated']) this[prop + 'Mutated'](event);
-        this.changed();
-        return;
+    disconnect(instance) {
+      if (this._instances.indexOf(instance) !== -1) {
+        this._instances.splice(this._instances.indexOf(instance), 1);
+      }
+      if (this._instances.length === 0 && this.__connected) {
+        this.disconnectedCallback();
       }
     }
-  }
-  connectedCallback() {
-    this.__listeners.connect();
-    this.__properties.connect();
-    this.__connected = true;
-    if (this.__objectProps.length) {
-      window.addEventListener('object-mutated', this.onObjectMutation);
+    preventDefault(event) {
+      event.preventDefault();
     }
-    this.queueDispatch();
-  }
-  disconnectedCallback() {
-    this.__listeners.disconnect();
-    this.__properties.disconnect();
-    this.__connected = false;
-    if (this.__objectProps.length) {
-      window.removeEventListener('object-mutated', this.onObjectMutation);
+    changed() {}
+    bind(prop) {
+      return this.__bindings.get(prop);
     }
-  }
-  dispose() {
-    this.__queue.dispose();
-    this.__bindings.dispose();
-    this.__listeners.dispose();
-    this.__properties.dispose();
-  }
-  addEventListener(type, listener) {
-    this.__listeners.addEventListener(type, listener);
-  }
-  removeEventListener(type, listener) {
-    this.__listeners.removeEventListener(type, listener);
-  }
-  dispatchEvent(type, detail, bubbles, src) {
-    this.__listeners.dispatchEvent(type, detail, bubbles, src);
-  }
-  queue(prop, value, oldValue) {
-    this.__queue.queue(prop, value, oldValue);
-  }
-  queueDispatch() {
-    this.__queue.dispatch();
-  }
+    set(prop, value) {
+      if (this[prop] !== value) {
+        const oldValue = this[prop];
+        this[prop] = value;
+        this.dispatchEvent(prop + '-set', {property: prop, value: value, oldValue: oldValue}, false);
+      }
+    }
+    setProperties(props) {
+      for (let p in props) {
+        if (this.__properties[p] === undefined) continue;
+        const oldValue = this.__properties[p].value;
+        this.__properties.set(p, props[p]);
+        const value = this.__properties[p].value;
+        if (value !== oldValue) this.queue(p, value, oldValue);
+      }
+
+      this.className = props['className'] || '';
+
+      if (props['style']) {
+        for (let s in props['style']) {
+          this.style[s] = props['style'][s];
+          this.style.setProperty(s, props['style'][s]);
+        }
+      }
+      // TODO: consider postpoining dispatch for unconnected elements.
+      // if (this.__connected) this.queueDispatch();
+      this.queueDispatch();
+    }
+    // TODO: test extensively
+    applyCompose(nodes) {
+      for (let n in nodes) {
+        const properties = nodes[n];
+        this[n].setProperties(properties);
+        this.addEventListener(n + '-changed', (event) => {
+          if (event.detail.oldValue) event.detail.oldValue.dispose(); // TODO: test
+          event.detail.value.setProperties(properties);
+        });
+      }
+    }
+    onObjectMutation(event) {
+      for (let i = this.__objectProps.length; i--;) {
+        const prop = this.__objectProps[i];
+        const value = this.__properties[prop].value;
+        if (value === event.detail.object) {
+          if (this[prop + 'Mutated']) this[prop + 'Mutated'](event);
+          this.changed();
+          return;
+        }
+      }
+    }
+    connectedCallback() {
+      this.__listeners.connect();
+      this.__properties.connect();
+      this.__connected = true;
+      if (this.__objectProps.length) {
+        window.addEventListener('object-mutated', this.onObjectMutation);
+      }
+      this.queueDispatch();
+    }
+    disconnectedCallback() {
+      this.__listeners.disconnect();
+      this.__properties.disconnect();
+      this.__connected = false;
+      if (this.__objectProps.length) {
+        window.removeEventListener('object-mutated', this.onObjectMutation);
+      }
+    }
+    dispose() {
+      this.__queue.dispose();
+      this.__bindings.dispose();
+      this.__listeners.dispose();
+      this.__properties.dispose();
+    }
+    addEventListener(type, listener) {
+      this.__listeners.addEventListener(type, listener);
+    }
+    removeEventListener(type, listener) {
+      this.__listeners.removeEventListener(type, listener);
+    }
+    dispatchEvent(type, detail, bubbles, src) {
+      this.__listeners.dispatchEvent(type, detail, bubbles, src);
+    }
+    queue(prop, value, oldValue) {
+      this.__queue.queue(prop, value, oldValue);
+    }
+    queueDispatch() {
+      this.__queue.dispatch();
+    }
+  };
+  classConstructor.Register = Register;
+  return classConstructor;
 };
 
-IoCoreMixin.Register = function () {
+const Register = function () {
   Object.defineProperty(this.prototype, '__registered', {value: true});
 
   const protochain = [];
@@ -592,9 +596,9 @@ IoCoreMixin.Register = function () {
   }
 };
 
-class IoNode extends IoCoreMixin(Object) {}
+IoCoreMixin.Register = Register;
 
-IoNode.Register = IoCoreMixin.Register;
+class IoNode extends IoCoreMixin(Object) {}
 
 // TODO: Documentation and tests
 
@@ -933,8 +937,6 @@ class IoStorageNode extends IoNode {
     }
   }
 }
-
-IoStorageNode.Register();
 
 function IoStorage(key, defValue, hash) {
   if (!nodes[key]) {
@@ -2950,12 +2952,12 @@ class IoSelector extends IoElement {
       }
       :host:not([vertical]) > io-tabs {
         margin: 0 var(--io-theme-spacing);
-        margin-bottom: -1px;
+        margin-bottom: calc(-1.1 * var(--io-theme-border-width));
       }
       :host[vertical] > io-tabs {
         flex: 0 0 auto;
         margin: var(--io-theme-spacing) 0;
-        margin-right: -1px;
+        margin-right: calc(-1.1 * var(--io-theme-border-width));
       }
       :host[vertical] > io-tabs > io-button,
       :host[vertical] > io-tabs > io-button.io-selected {
@@ -3247,7 +3249,7 @@ class IoTheme extends IoElement {
         --padding: 3px;
         --border-radius: 2px;
         --border-width: 1px;
-        --border: 1px solid rgba(128, 128, 128, 0.25);
+        --border: var(--border-width) solid rgba(128, 128, 128, 0.25);
         --color: #000;
 
         --number-color: rgb(28, 0, 207);
