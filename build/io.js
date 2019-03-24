@@ -1234,6 +1234,9 @@ class IoButton extends IoElement {
       :host[pressed] {
         background: var(--io-theme-active-bg);
       }
+      :host > span {
+        text-align: center;
+      }
     </style>`;
   }
   static get properties() {
@@ -1274,7 +1277,9 @@ class IoButton extends IoElement {
   }
   changed() {
     this.title = this.label;
-    this.innerText = this.label;
+    this.template([
+      ['span', this.label]
+    ]);
   }
 }
 
@@ -1691,14 +1696,16 @@ class IoInspectorLink extends IoButton {
       }
     </style>`;
   }
-  valueChanged() {
+  changed() {
     let name = this.value.constructor.name;
     if (this.value.name) name += ' (' + this.value.name + ')';
     else if (this.value.label) name += ' (' + this.value.label + ')';
     else if (this.value.title) name += ' (' + this.value.title + ')';
     else if (this.value.id) name += ' (' + this.value.id + ')';
     this.title = name;
-    this.innerText = name;
+    this.template([
+      ['span', name]
+    ]);
   }
 }
 
@@ -1817,7 +1824,7 @@ class IoInspector extends IoElement {
       if (!lastrumb || !isValueOfPropertyOf(this.value, lastrumb)) this.crumbs.length = 0;
       this.crumbs.push(this.value);
     }
-    this.crumbs = [...this.crumbs];
+    this.dispatchEvent('object-mutated', {object: this.crumbs}, false, window);
   }
   changed() {
     const elements = [
