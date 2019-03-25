@@ -2342,7 +2342,7 @@ class IoMenuLayer extends IoElement {
         }
         break;
     }
-    group._x = Math.min(group._x, window.innerWidth - rect.width);
+    group._x = Math.max(0, Math.min(group._x, window.innerWidth - rect.width));
     group._y = Math.min(group._y, window.innerHeight - rect.height);
     group.style.left = group._x + 'px';
     group.style.top = group._y + 'px';
