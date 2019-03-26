@@ -863,7 +863,7 @@ class IoServiceLoader extends IoNode {
     return {
       path: 'service.js',
       serviceWorker: undefined,
-      granted: window.Notification.permission === 'granted',
+      granted: window.Notification && window.Notification.permission === 'granted',
       subscription: '',
     };
 
@@ -3264,7 +3264,7 @@ class IoTheme extends IoElement {
         --string-color: rgb(196, 26, 22);
         --boolean-color: rgb(170, 13, 145);
 
-        --link-color: #09d;
+        --link-color: #06a;
         --focus-border: 1px solid #09d;
         --focus-bg: #def;
         --active-bg: #ef8;
