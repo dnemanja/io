@@ -624,6 +624,11 @@ class IoElement extends IoCoreMixin(HTMLElement) {
         reflect: true,
         enumerable: false
       },
+      role: {
+        type: String,
+        reflect: true,
+        enumerable: false
+      },
       $: {
         type: Object,
       },
@@ -999,49 +1004,7 @@ function IoStorage(key, defValue, hash) {
 
 class IoProperties extends IoElement {
   static get style() {
-    return html`<style>
-      :host {
-        display: flex;
-        flex-direction: column;
-        flex: 0 0;
-        line-height: 1em;
-      }
-      :host > .io-property {
-        display: flex !important;
-        flex-direction: row;
-      }
-      :host > .io-property > .io-property-label {
-        padding: 0 0.2em 0 0.5em;
-        flex: 0 0 auto;
-        color: var(--io-theme-color);
-      }
-      :host > .io-property > .io-property-editor {
-        margin: 0;
-        padding: 0;
-      }
-      :host > .io-property > io-object,
-      :host > .io-property > io-object > io-boolean,
-      :host > .io-property > io-object > io-properties {
-        padding: 0 !important;
-        border: none !important;
-        background: none !important;
-      }
-      :host > .io-property > io-number,
-      :host > .io-property > io-string,
-      :host > .io-property > io-boolean {
-        border: none;
-        background: none;
-      }
-      :host > .io-property > io-number {
-        color: var(--io-theme-number-color);
-      }
-      :host > .io-property > io-string {
-        color: var(--io-theme-string-color);
-      }
-      :host > .io-property > io-boolean {
-        color: var(--io-theme-boolean-color);
-      }
-    </style>`;
+    return html`<style>:host {display: flex;flex-direction: column;flex: 0 0;line-height: 1em;}:host > .io-property {display: flex !important;flex-direction: row;}:host > .io-property > .io-property-label {padding: 0 0.2em 0 0.5em;flex: 0 0 auto;color: var(--io-theme-color);}:host > .io-property > .io-property-editor {margin: 0;padding: 0;}:host > .io-property > io-object,:host > .io-property > io-object > io-boolean,:host > .io-property > io-object > io-properties {padding: 0 !important;border: none !important;background: none !important;}:host > .io-property > io-number,:host > .io-property > io-string,:host > .io-property > io-boolean {border: none;background: none;}:host > .io-property > io-number {color: var(--io-theme-number-color);}:host > .io-property > io-string {color: var(--io-theme-string-color);}:host > .io-property > io-boolean {color: var(--io-theme-boolean-color);}</style>`;
   }
   static get properties() {
     return {
@@ -1174,22 +1137,7 @@ IoProperties.RegisterConfig = function(config) {
 
 class IoArray extends IoProperties {
   static get style() {
-    return html`<style>
-      :host {
-        display: grid;
-        grid-row-gap: var(--io-theme-spacing);
-        grid-column-gap: var(--io-theme-spacing);
-      }
-      :host[columns="2"] {
-        grid-template-columns: auto auto;
-      }
-      :host[columns="3"] {
-        grid-template-columns: auto auto auto;
-      }
-      :host[columns="4"] {
-        grid-template-columns: auto auto auto auto;
-      }
-    </style>`;
+    return html`<style>:host {display: grid;grid-row-gap: var(--io-theme-spacing);grid-column-gap: var(--io-theme-spacing);}:host[columns="2"] {grid-template-columns: auto auto;}:host[columns="3"] {grid-template-columns: auto auto auto;}:host[columns="4"] {grid-template-columns: auto auto auto auto;}</style>`;
   }
   changed() {
     const elements = [];
@@ -1205,39 +1153,7 @@ IoArray.Register();
 
 class IoButton extends IoElement {
   static get style() {
-    return html`<style>
-      :host {
-        display: inline-block;
-        cursor: pointer;
-        white-space: nowrap;
-        -webkit-tap-highlight-color: transparent;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        line-height: 1em;
-        border: var(--io-theme-button-border);
-        border-radius: var(--io-theme-border-radius);
-        padding: var(--io-theme-padding);
-        padding-left: calc(3 * var(--io-theme-padding));
-        padding-right: calc(3 * var(--io-theme-padding));
-        background: var(--io-theme-button-bg);
-        transition: background-color 0.4s;
-        color: var(--io-theme-color);
-        user-select: none;
-      }
-      :host:focus {
-        outline: none;
-        background: var(--io-theme-focus-bg);
-      }
-      :host:hover {
-        background: var(--io-theme-hover-bg);
-      }
-      :host[pressed] {
-        background: var(--io-theme-active-bg);
-      }
-      :host > span {
-        text-align: center;
-      }
-    </style>`;
+    return html`<style>:host {display: inline-block;cursor: pointer;white-space: nowrap;-webkit-tap-highlight-color: transparent;overflow: hidden;text-overflow: ellipsis;line-height: 1em;border: var(--io-theme-button-border);border-radius: var(--io-theme-border-radius);padding: var(--io-theme-padding);padding-left: calc(3 * var(--io-theme-padding));padding-right: calc(3 * var(--io-theme-padding));background: var(--io-theme-button-bg);transition: background-color 0.4s;color: var(--io-theme-color);user-select: none;}:host:focus {outline: none;background: var(--io-theme-focus-bg);}:host:hover {background: var(--io-theme-hover-bg);}:host[pressed] {background: var(--io-theme-active-bg);}:host > span {text-align: center;}</style>`;
   }
   static get properties() {
     return {
@@ -1287,12 +1203,7 @@ IoButton.Register();
 
 class IoBoolean extends IoButton {
   static get style() {
-    return html`<style>
-      :host {
-        display: inline;
-        background: none;
-      }
-    </style>`;
+    return html`<style>:host {display: inline;background: none;}</style>`;
   }
   static get properties() {
     return {
@@ -1361,21 +1272,7 @@ const shadersCache = new WeakMap();
 
 class IoCanvas extends IoElement {
   static get style() {
-    return html`<style>
-      :host {
-        box-sizing: border-box;
-        overflow: hidden;
-        position: relative;
-        border: 1px solid black;
-      }
-      :host canvas {
-        position: absolute;
-        top: 0px;
-        left: 0px;
-        touch-action: none;
-        user-select: none;
-      }
-    </style>`;
+    return html`<style>:host {box-sizing: border-box;overflow: hidden;position: relative;border: 1px solid black;}:host canvas {position: absolute;top: 0px;left: 0px;touch-action: none;user-select: none;}</style>`;
   }
   static get properties() {
     return {
@@ -1499,43 +1396,7 @@ IoCanvas.Register();
 
 class IoCollapsable extends IoElement {
   static get style() {
-    return html`<style>
-      :host {
-        display: flex;
-        flex-direction: column;
-        border: var(--io-theme-frame-border);
-        border-radius: var(--io-theme-border-radius);
-        padding: var(--io-theme-padding);
-        background: var(--io-theme-frame-bg);
-      }
-      :host > io-boolean {
-        border: none;
-        border-radius: 0;
-        background: none;
-      }
-      :host > io-boolean:focus {
-        border: none;
-      }
-      :host > io-boolean::before {
-        content: '▸';
-        display: inline-block;
-        width: 0.65em;
-        margin: 0 0.25em;
-      }
-      :host[expanded] > io-boolean{
-        margin-bottom: var(--io-theme-padding);
-      }
-      :host[expanded] > io-boolean::before{
-        content: '▾';
-      }
-      :host > .io-collapsable-content {
-        display: block;
-        border: var(--io-theme-content-border);
-        border-radius: var(--io-theme-border-radius);
-        padding: var(--io-theme-padding);
-        background: var(--io-theme-content-bg);
-      }
-    </style>`;
+    return html`<style>:host {display: flex;flex-direction: column;border: var(--io-theme-frame-border);border-radius: var(--io-theme-border-radius);padding: var(--io-theme-padding);background: var(--io-theme-frame-bg);}:host > io-boolean {border: none;border-radius: 0;background: none;}:host > io-boolean:focus {border: none;}:host > io-boolean::before {content: '▸';display: inline-block;width: 0.65em;margin: 0 0.25em;}:host[expanded] > io-boolean{margin-bottom: var(--io-theme-padding);}:host[expanded] > io-boolean::before{content: '▾';}:host > .io-collapsable-content {display: block;border: var(--io-theme-content-border);border-radius: var(--io-theme-border-radius);padding: var(--io-theme-padding);background: var(--io-theme-content-bg);}</style>`;
   }
   static get properties() {
     return {
@@ -1620,42 +1481,7 @@ IoElementCache.Register();
 
 class IoInspectorBreadcrumbs extends IoElement {
   static get style() {
-    return html`<style>
-      :host {
-        display: flex;
-        flex: 1 0;
-        flex-direction: row;
-        border: var(--io-theme-field-border);
-        border-radius: var(--io-theme-border-radius);
-        padding: var(--io-theme-padding);
-        color: var(--io-theme-field-color);
-        background: var(--io-theme-field-bg);
-      }
-      :host > io-inspector-link {
-        border: none;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        background: none;
-        padding: 0;
-        padding: var(--io-theme-padding);
-      }
-      :host > io-inspector-link:first-of-type {
-        color: var(--io-theme-color);
-        overflow: visible;
-        text-overflow: clip;
-        margin-left: 0.5em;
-      }
-      :host > io-inspector-link:last-of-type {
-        overflow: visible;
-        text-overflow: clip;
-        margin-right: 0.5em;
-      }
-      :host > io-inspector-link:not(:first-of-type):before {
-        content: '>';
-        margin: 0 0.5em;
-        opacity: 0.25;
-      }
-    </style>`;
+    return html`<style>:host {display: flex;flex: 1 0;flex-direction: row;border: var(--io-theme-field-border);border-radius: var(--io-theme-border-radius);padding: var(--io-theme-padding);color: var(--io-theme-field-color);background: var(--io-theme-field-bg);}:host > io-inspector-link {border: none;overflow: hidden;text-overflow: ellipsis;background: none;padding: 0;padding: var(--io-theme-padding);}:host > io-inspector-link:first-of-type {color: var(--io-theme-color);overflow: visible;text-overflow: clip;margin-left: 0.5em;}:host > io-inspector-link:last-of-type {overflow: visible;text-overflow: clip;margin-right: 0.5em;}:host > io-inspector-link:not(:first-of-type):before {content: '>';margin: 0 0.5em;opacity: 0.25;}</style>`;
   }
   static get properties() {
     return {
@@ -1671,30 +1497,7 @@ IoInspectorBreadcrumbs.Register();
 
 class IoInspectorLink extends IoButton {
   static get style() {
-    return html`<style>
-      :host {
-        border: none;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        background: none;
-        padding: 0;
-        border: 1px solid transparent;
-        color: var(--io-theme-link-color);
-        padding: var(--io-theme-padding) !important;
-      }
-      :host:focus {
-        outline: none;
-        background: none;
-        text-decoration: underline;
-      }
-      :host:hover {
-        background: none;
-        text-decoration: underline;
-      }
-      :host[pressed] {
-        background: none;
-      }
-    </style>`;
+    return html`<style>:host {border: none;overflow: hidden;text-overflow: ellipsis;background: none;padding: 0;border: 1px solid transparent;color: var(--io-theme-link-color);padding: var(--io-theme-padding) !important;}:host:focus {outline: none;background: none;text-decoration: underline;}:host:hover {background: none;text-decoration: underline;}:host[pressed] {background: none;}</style>`;
   }
   changed() {
     let name = this.value.constructor.name;
@@ -1718,79 +1521,7 @@ function isValueOfPropertyOf(prop, object) {
 
 class IoInspector extends IoElement {
   static get style() {
-    return html`<style>
-    :host {
-      display: flex;
-      flex-direction: column;
-      border: var(--io-theme-content-border);
-      border-radius: var(--io-theme-border-radius);
-      padding: var(--io-theme-padding);
-      background: var(--io-theme-content-bg);
-    }
-    :host > io-inspector-breadcrumbs {
-      margin: var(--io-theme-spacing);
-    }
-    :host > io-collapsable {
-      margin: var(--io-theme-spacing);
-    }
-    :host > io-collapsable > div io-properties > .io-property {
-      overflow: hidden;
-      padding: var(--io-theme-padding);
-    }
-    :host > io-collapsable > div io-properties > .io-property:not(:last-of-type) {
-      border-bottom: var(--io-theme-border);
-    }
-    :host > io-collapsable > div io-properties > .io-property > :nth-child(1) {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      text-align: right;
-      flex: 0 1 8em;
-      min-width: 3em;
-      padding: var(--io-theme-padding);
-      margin: calc(0.25 * var(--io-theme-spacing));
-    }
-    :host > io-collapsable > div io-properties > .io-property > :nth-child(2) {
-      flex: 1 0 8em;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      min-width: 2em;
-    }
-
-    /* :host > .io-property > io-object,
-    :host > .io-property > io-object > io-boolean,
-    :host > .io-property > io-object > io-properties {
-      padding: 0 !important;
-      border: none !important;
-      background: none !important;
-    } */
-
-    :host div io-properties > .io-property > io-object,
-    :host div io-properties > .io-property > io-number,
-    :host div io-properties > .io-property > io-string,
-    :host div io-properties > .io-property > io-boolean {
-      border: 1px solid transparent;
-      padding: var(--io-theme-padding) !important;
-    }
-    :host div io-properties > .io-property > io-boolean:not([value]) {
-      opacity: 0.5;
-    }
-    :host div io-properties > .io-property > io-option {
-      flex: 0 1 auto !important;
-      padding: var(--io-theme-padding) !important;
-    }
-    :host div io-properties > .io-property > io-number,
-    :host div io-properties > .io-property > io-string {
-      border: var(--io-theme-field-border);
-      color: var(--io-theme-field-color);
-      background: var(--io-theme-field-bg);
-    }
-
-    :host io-properties > .io-property > io-properties {
-      border: var(--io-theme-field-border);
-      background: rgba(127, 127, 127, 0.125);
-    }
-    </style>`;
+    return html`<style>:host {display: flex;flex-direction: column;border: var(--io-theme-content-border);border-radius: var(--io-theme-border-radius);padding: var(--io-theme-padding);background: var(--io-theme-content-bg);}:host > io-inspector-breadcrumbs {margin: var(--io-theme-spacing);}:host > io-collapsable {margin: var(--io-theme-spacing);}:host > io-collapsable > div io-properties > .io-property {overflow: hidden;padding: var(--io-theme-padding);}:host > io-collapsable > div io-properties > .io-property:not(:last-of-type) {border-bottom: var(--io-theme-border);}:host > io-collapsable > div io-properties > .io-property > :nth-child(1) {overflow: hidden;text-overflow: ellipsis;text-align: right;flex: 0 1 8em;min-width: 3em;padding: var(--io-theme-padding);margin: calc(0.25 * var(--io-theme-spacing));}:host > io-collapsable > div io-properties > .io-property > :nth-child(2) {flex: 1 0 8em;white-space: nowrap;overflow: hidden;text-overflow: ellipsis;min-width: 2em;}/* :host > .io-property > io-object,:host > .io-property > io-object > io-boolean,:host > .io-property > io-object > io-properties {padding: 0 !important;border: none !important;background: none !important;} */:host div io-properties > .io-property > io-object,:host div io-properties > .io-property > io-number,:host div io-properties > .io-property > io-string,:host div io-properties > .io-property > io-boolean {border: 1px solid transparent;padding: var(--io-theme-padding) !important;}:host div io-properties > .io-property > io-boolean:not([value]) {opacity: 0.5;}:host div io-properties > .io-property > io-option {flex: 0 1 auto !important;padding: var(--io-theme-padding) !important;}:host div io-properties > .io-property > io-number,:host div io-properties > .io-property > io-string {border: var(--io-theme-field-border);color: var(--io-theme-field-color);background: var(--io-theme-field-bg);}:host io-properties > .io-property > io-properties {border: var(--io-theme-field-border);background: rgba(127, 127, 127, 0.125);}</style>`;
   }
   static get properties() {
     return {
@@ -2042,7 +1773,8 @@ class IoMdView extends IoElement {
         type: String,
         reflect: true
       },
-      vars: Object
+      vars: Object,
+      role: 'document',
     };
   }
   pathChanged() {
@@ -2070,37 +1802,7 @@ let WAIT_TIME = 1200;
 
 class IoMenuLayer extends IoElement {
   static get style() {
-    return html`<style>
-      :host {
-        display: block;
-        visibility: hidden;
-        position: fixed;
-        top: 0;
-        left: 0;
-        bottom: 0;
-        right: 0;
-        z-index: 100000;
-        background: rgba(0, 0, 0, 0.2);
-        user-select: none;
-        overflow: hidden;
-        pointer-events: none;
-        touch-action: none;
-      }
-      :host[expanded] {
-        visibility: visible;
-        pointer-events: all;
-      }
-      :host io-menu-options:not([expanded]) {
-        display: none;
-      }
-      :host io-menu-options {
-        position: absolute;
-        transform: translateZ(0);
-        top: 0;
-        left: 0;
-        min-width: 6em;
-      }
-    </style>`;
+    return html`<style>:host {display: block;visibility: hidden;position: fixed;top: 0;left: 0;bottom: 0;right: 0;z-index: 100000;background: rgba(0, 0, 0, 0.2);user-select: none;overflow: hidden;pointer-events: none;touch-action: none;}:host[expanded] {visibility: visible;pointer-events: all;}:host io-menu-options:not([expanded]) {display: none;}:host io-menu-options {position: absolute;transform: translateZ(0);top: 0;left: 0;min-width: 6em;}</style>`;
   }
   static get properties() {
     return {
@@ -2378,31 +2080,7 @@ document.body.appendChild(IoMenuLayer.singleton);
 
 class IoMenuOptions extends IoElement {
   static get style() {
-    return html`<style>
-      :host {
-        display: flex;
-        flex-direction: column;
-        white-space: nowrap;
-        user-select: none;
-        touch-action: none;
-        background: white;
-        color: black;
-        padding: var(--io-theme-padding);
-        border: var(--io-theme-menu-border);
-        border-radius: var(--io-theme-border-radius);
-        box-shadow: var(--io-theme-menu-shadow);
-      }
-      :host[horizontal] {
-        flex-direction: row;
-      }
-      :host[horizontal] > io-menu-item {
-        margin-left: 0.5em;
-        margin-right: 0.5em;
-      }
-      :host[horizontal] > io-menu-item > :not(.menu-label) {
-        display: none;
-      }
-    </style>`;
+    return html`<style>:host {display: flex;flex-direction: column;white-space: nowrap;user-select: none;touch-action: none;background: white;color: black;padding: var(--io-theme-padding);border: var(--io-theme-menu-border);border-radius: var(--io-theme-border-radius);box-shadow: var(--io-theme-menu-shadow);}:host[horizontal] {flex-direction: row;}:host[horizontal] > io-menu-item {margin-left: 0.5em;margin-right: 0.5em;}:host[horizontal] > io-menu-item > :not(.menu-label) {display: none;}</style>`;
   }
   static get properties() {
     return {
@@ -2457,39 +2135,7 @@ IoMenuOptions.Register();
 
 class IoMenuItem extends IoElement {
   static get style() {
-    return html`<style>
-      :host {
-        display: flex;
-        flex-direction: row;
-        cursor: pointer;
-        padding: var(--io-theme-padding);
-        line-height: 1em;
-        touch-action: none;
-      }
-      :host > * {
-        pointer-events: none;
-        padding: var(--io-theme-spacing);
-      }
-      :host > .menu-icon {
-        width: 1.25em;
-        line-height: 1em;
-      }
-      :host > .menu-label {
-        flex: 1;
-      }
-      :host > .menu-hint {
-        opacity: 0.5;
-        padding: 0 0.5em;
-      }
-      :host > .menu-more {
-        opacity: 0.25;
-      }
-      /* @media (-webkit-min-device-pixel-ratio: 2) {
-        :host > * {
-          padding: calc(2 * var(--io-theme-spacing));
-        }
-      } */
-    </style>`;
+    return html`<style>:host {display: flex;flex-direction: row;cursor: pointer;padding: var(--io-theme-padding);line-height: 1em;touch-action: none;}:host > * {pointer-events: none;padding: var(--io-theme-spacing);}:host > .menu-icon {width: 1.25em;line-height: 1em;}:host > .menu-label {flex: 1;}:host > .menu-hint {opacity: 0.5;padding: 0 0.5em;}:host > .menu-more {opacity: 0.25;}/* @media (-webkit-min-device-pixel-ratio: 2) {:host > * {padding: calc(2 * var(--io-theme-spacing));}} */</style>`;
   }
   static get properties() {
     return {
@@ -2640,25 +2286,7 @@ const range = document.createRange();
 
 class IoNumber extends IoElement {
   static get style() {
-    return html`<style>
-      :host {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        border: var(--io-theme-field-border);
-        border-radius: var(--io-theme-border-radius);
-        padding: var(--io-theme-padding);
-        color: var(--io-theme-field-color);
-        background: var(--io-theme-field-bg);
-      }
-      :host:focus {
-        overflow: hidden;
-        text-overflow: clip;
-        outline: none;
-        border: var(--io-theme-focus-border);
-        background: var(--io-theme-focus-bg);
-      }
-    </style>`;
+    return html`<style>:host {overflow: hidden;text-overflow: ellipsis;white-space: nowrap;border: var(--io-theme-field-border);border-radius: var(--io-theme-border-radius);padding: var(--io-theme-padding);color: var(--io-theme-field-color);background: var(--io-theme-field-bg);}:host:focus {overflow: hidden;text-overflow: clip;outline: none;border: var(--io-theme-focus-border);background: var(--io-theme-focus-bg);}</style>`;
   }
   static get properties() {
     return {
@@ -2756,13 +2384,7 @@ IoObject.Register();
 
 class IoOption extends IoButton {
   static get style() {
-    return html`<style>
-      :host:not([hamburger])::after {
-        width: 0.65em;
-        margin-left: 0.25em;
-        content: '▾';
-      }
-    </style>`;
+    return html`<style>:host:not([hamburger])::after {width: 0.65em;margin-left: 0.25em;content: '▾';}</style>`;
   }
   static get properties() {
     return {
@@ -2818,80 +2440,7 @@ IoOption.Register();
 
 class IoTabs extends IoElement {
   static get style() {
-    return html`<style>
-      :host {
-        display: flex;
-        flex-direction: row;
-        flex-wrap: nowrap;
-        font-style: italic;
-        overflow: hidden;
-      }
-      :host > * {
-        flex: 0 0 auto;
-        display: none;
-      }
-      :host:not([vertical]) > * {
-        margin-right: var(--io-theme-spacing);
-      }
-      :host[vertical] > * {
-        margin-bottom: var(--io-theme-spacing);
-      }
-      :host[vertical] > io-option {
-        padding: calc(var(--io-theme-padding) * 9) var(--io-theme-padding);
-      }
-      :host[vertical] {
-        flex-direction: column;
-      }
-      :host[vertical][collapsed] > io-option {
-        display: inherit;
-      }
-      :host[vertical]:not([collapsed]) > :nth-child(n+3) {
-        display: inherit;
-      }
-      :host:not([vertical])[overflow] > :nth-child(-n+2) {
-        display: inherit;
-      }
-      :host:not([vertical]):not([overflow]) > :nth-child(n+3) {
-        display: inherit;
-      }
-      :host:not([vertical])[overflow] > :nth-child(n+3) {
-        display: inherit;
-        visibility: hidden;
-      }
-      :host:not([vertical]) > * {
-        border-bottom-left-radius: 0;
-        border-bottom-right-radius: 0;
-        background-image: linear-gradient(0deg, rgba(0, 0, 0, 0.125), transparent 0.75em);
-      }
-      :host:not([vertical]) > *.io-selected {
-        border-bottom-color: var(--io-theme-content-bg);
-        background-image: none;
-      }
-      :host[vertical] > * {
-        border-top-right-radius: 0;
-        border-bottom-right-radius: 0;
-        background-image: linear-gradient(270deg, rgba(0, 0, 0, 0.125), transparent 0.75em);
-      }
-      :host[vertical] > *.io-selected {
-        border-right-color: var(--io-theme-content-bg);
-        background-image: none;
-      }
-      :host > io-option {
-        font-style: normal;
-      }
-      :host > io-button {
-        letter-spacing: 0.145em;
-        font-weight: 500;
-      }
-      :host > io-button:not(.io-selected) {
-        color: rgba(0, 0, 0, 0.5);
-      }
-      :host > io-button.io-selected {
-        background: var(--io-theme-content-bg);
-        font-weight: 600;
-        letter-spacing: 0.11em;
-      }
-    </style>`;
+    return html`<style>:host {display: flex;flex-direction: row;flex-wrap: nowrap;font-style: italic;overflow: hidden;}:host > * {flex: 0 0 auto;display: none;}:host:not([vertical]) > * {margin-right: var(--io-theme-spacing);}:host[vertical] > * {margin-bottom: var(--io-theme-spacing);}:host[vertical] > io-option {padding: calc(var(--io-theme-padding) * 9) var(--io-theme-padding);}:host[vertical] {flex-direction: column;}:host[vertical][collapsed] > io-option {display: inherit;}:host[vertical]:not([collapsed]) > :nth-child(n+3) {display: inherit;}:host:not([vertical])[overflow] > :nth-child(-n+2) {display: inherit;}:host:not([vertical]):not([overflow]) > :nth-child(n+3) {display: inherit;}:host:not([vertical])[overflow] > :nth-child(n+3) {display: inherit;visibility: hidden;}:host:not([vertical]) > * {border-bottom-left-radius: 0;border-bottom-right-radius: 0;background-image: linear-gradient(0deg, rgba(0, 0, 0, 0.125), transparent 0.75em);}:host:not([vertical]) > *.io-selected {border-bottom-color: var(--io-theme-content-bg);background-image: none;}:host[vertical] > * {border-top-right-radius: 0;border-bottom-right-radius: 0;background-image: linear-gradient(270deg, rgba(0, 0, 0, 0.125), transparent 0.75em);}:host[vertical] > *.io-selected {border-right-color: var(--io-theme-content-bg);background-image: none;}:host > io-option {font-style: normal;}:host > io-button {letter-spacing: 0.145em;font-weight: 500;}:host > io-button:not(.io-selected) {color: rgba(0, 0, 0, 0.5);}:host > io-button.io-selected {background: var(--io-theme-content-bg);font-weight: 600;letter-spacing: 0.11em;}</style>`;
   }
   static get properties() {
     return {
@@ -2943,50 +2492,7 @@ IoTabs.Register();
 
 class IoSelector extends IoElement {
   static get style() {
-    return html`<style>
-      :host {
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        position: relative;
-        overflow: auto;
-      }
-      :host[vertical] {
-        flex-direction: row;
-      }
-      :host > io-tabs {
-        z-index: 2;
-        flex: 0 0 auto;
-      }
-      :host:not([vertical]) > io-tabs {
-        margin: 0 var(--io-theme-spacing);
-        margin-bottom: calc(-1.1 * var(--io-theme-border-width));
-      }
-      :host[vertical] > io-tabs {
-        flex: 0 0 auto;
-        margin: var(--io-theme-spacing) 0;
-        margin-right: calc(-1.1 * var(--io-theme-border-width));
-      }
-      :host[vertical] > io-tabs > io-button,
-      :host[vertical] > io-tabs > io-button.io-selected {
-        align-self: flex-end;
-        color: var(--io-theme-link-color);
-        border: none;
-        background: none;
-        background-image: none !important;
-      }
-      :host[vertical] > io-tabs > io-button:hover {
-        text-decoration: underline;
-      }
-      :host > io-element-cache {
-        flex: 1 1 auto;
-        padding: var(--io-theme-padding);
-        border: var(--io-theme-content-border);
-        border-radius: var(--io-theme-border-radius);
-        background: var(--io-theme-content-bg);
-        overflow: auto;
-      }
-    </style>`;
+    return html`<style>:host {display: flex;flex-direction: column;align-items: stretch;position: relative;overflow: auto;}:host[vertical] {flex-direction: row;}:host > io-tabs {z-index: 2;flex: 0 0 auto;}:host:not([vertical]) > io-tabs {margin: 0 var(--io-theme-spacing);margin-bottom: calc(-1.1 * var(--io-theme-border-width));}:host[vertical] > io-tabs {flex: 0 0 auto;margin: var(--io-theme-spacing) 0;margin-right: calc(-1.1 * var(--io-theme-border-width));}:host[vertical] > io-tabs > io-button,:host[vertical] > io-tabs > io-button.io-selected {align-self: flex-end;color: var(--io-theme-link-color);border: none;background: none;background-image: none !important;}:host[vertical] > io-tabs > io-button:hover {text-decoration: underline;}:host > io-element-cache {flex: 1 1 auto;padding: var(--io-theme-padding);border: var(--io-theme-content-border);border-radius: var(--io-theme-border-radius);background: var(--io-theme-content-bg);overflow: auto;}</style>`;
   }
   static get properties() {
     return {
@@ -3025,6 +2531,7 @@ class IoSelector extends IoElement {
         vertical: this.vertical,
         collapsed: this.collapsed,
         options: options,
+        role: 'navigation',
       }],
       ['io-element-cache', {
         elements: this.elements,
@@ -3040,60 +2547,7 @@ IoSelector.Register();
 
 class IoSlider extends IoElement {
   static get style() {
-    return html`<style>
-      :host {
-        display: flex;
-        flex-direction: row;
-        min-width: 12em;
-      }
-      :host > io-number {
-        flex: 0 0 auto;
-      }
-      :host > io-slider-knob {
-        flex: 1 1 auto;
-        margin-left: var(--io-theme-spacing);
-        border-radius: 2px;
-      }
-    </style>`;
-  }
-  static get properties() {
-    return {
-      value: 0,
-      step: 0.001,
-      min: 0,
-      max: 1,
-      strict: true,
-    };
-  }
-  _onValueSet(event) {
-    this.dispatchEvent('value-set', event.detail, false);
-    this.value = event.detail.value;
-  }
-  changed() {
-    const charLength = (Math.max(Math.max(String(this.min).length, String(this.max).length), String(this.step).length));
-    this.template([
-      ['io-number', {value: this.value, step: this.step, min: this.min, max: this.max, strict: this.strict, id: 'number', 'on-value-set': this._onValueSet}],
-      ['io-slider-knob', {value: this.value, step: this.step, minValue: this.min, maxValue: this.max, id: 'slider', 'on-value-set': this._onValueSet}]
-    ]);
-    this.$.number.style.setProperty('min-width', charLength + 'em');
-  }
-}
-
-IoSlider.Register();
-
-class IoSliderKnob extends IoCanvas {
-  static get style() {
-    return html`<style>
-      :host {
-        display: flex;
-        cursor: ew-resize;
-        touch-action: none;
-      }
-      :host > img {
-        pointer-events: none;
-        touch-action: none;
-      }
-    </style>`;
+    return html`<style>:host {display: flex;flex-direction: row;min-width: 12em;}:host > io-number {flex: 0 0 auto;}:host > io-slider-knob {flex: 1 1 auto;margin-left: var(--io-theme-spacing);border-radius: 2px;}</style>`;}static get properties() {return {value: 0,step: 0.001,min: 0,max: 1,strict: true,};}_onValueSet(event) {this.dispatchEvent('value-set', event.detail, false);this.value = event.detail.value;}changed() {const charLength = (Math.max(Math.max(String(this.min).length, String(this.max).length), String(this.step).length));this.template([['io-number', {value: this.value, step: this.step, min: this.min, max: this.max, strict: this.strict, id: 'number', 'on-value-set': this._onValueSet}],['io-slider-knob', {value: this.value, step: this.step, minValue: this.min, maxValue: this.max, id: 'slider', 'on-value-set': this._onValueSet}]]);this.$.number.style.setProperty('min-width', charLength + 'em');}}IoSlider.Register();class IoSliderKnob extends IoCanvas {static get style() {return html`<style>:host {display: flex;cursor: ew-resize;touch-action: none;}:host > img {pointer-events: none;touch-action: none;}</style>`;
   }
   static get properties() {
     return {
@@ -3185,25 +2639,7 @@ const range$1 = document.createRange();
 
 class IoString extends IoElement {
   static get style() {
-    return html`<style>
-      :host {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        border: var(--io-theme-field-border);
-        border-radius: var(--io-theme-border-radius);
-        padding: var(--io-theme-padding);
-        color: var(--io-theme-field-color);
-        background: var(--io-theme-field-bg);
-      }
-      :host:focus {
-        overflow: hidden;
-        text-overflow: clip;
-        outline: none;
-        border: var(--io-theme-focus-border);
-        background: var(--io-theme-focus-bg);
-      }
-    </style>`;
+    return html`<style>:host {overflow: hidden;text-overflow: ellipsis;white-space: nowrap;border: var(--io-theme-field-border);border-radius: var(--io-theme-border-radius);padding: var(--io-theme-padding);color: var(--io-theme-field-color);background: var(--io-theme-field-bg);}:host:focus {overflow: hidden;text-overflow: clip;outline: none;border: var(--io-theme-focus-border);background: var(--io-theme-focus-bg);}</style>`;
   }
   static get properties() {
     return {
@@ -3249,53 +2685,7 @@ IoString.Register();
 
 class IoTheme extends IoElement {
   static get style() {
-    return html`<style>
-      body {
-        --bg: #eee;
-        --radius: 5px 5px 5px 5px;
-        --spacing: 3px;
-        --padding: 3px;
-        --border-radius: 2px;
-        --border-width: 1px;
-        --border: var(--border-width) solid rgba(128, 128, 128, 0.25);
-        --color: #000;
-
-        --number-color: rgb(28, 0, 207);
-        --string-color: rgb(196, 26, 22);
-        --boolean-color: rgb(170, 13, 145);
-
-        --link-color: #06a;
-        --focus-border: 1px solid #09d;
-        --focus-bg: #def;
-        --active-bg: #ef8;
-        --hover-bg: #fff;
-
-        --frame-border: 1px solid #aaa;
-        --frame-bg: #ccc;
-
-        --content-border: 1px solid #aaa;
-        --content-bg: #eee;
-
-        --button-border: 1px solid #999;
-        --button-bg: #bbb;
-
-        --field-border: 1px solid #ccc;
-        --field-color: #333;
-        --field-bg: white;
-
-        --menu-border: 1px solid #999;
-        --menu-bg: #bbb;
-        --menu-shadow: 2px 3px 5px rgba(0,0,0,0.2);
-      }
-      @media (-webkit-min-device-pixel-ratio: 2) {
-        body {
-          --radius: 7px 7px 7px 7px;
-          --spacing: 4px;
-          --padding: 4px;
-          --border-radius: 4px;
-        }
-      }
-    </style>`;
+    return html`<style>body {--bg: #eee;--radius: 5px 5px 5px 5px;--spacing: 3px;--padding: 3px;--border-radius: 2px;--border-width: 1px;--border: var(--border-width) solid rgba(128, 128, 128, 0.25);--color: #000;--number-color: rgb(28, 0, 207);--string-color: rgb(196, 26, 22);--boolean-color: rgb(170, 13, 145);--link-color: #06a;--focus-border: 1px solid #09d;--focus-bg: #def;--active-bg: #ef8;--hover-bg: #fff;--frame-border: 1px solid #aaa;--frame-bg: #ccc;--content-border: 1px solid #aaa;--content-bg: #eee;--button-border: 1px solid #999;--button-bg: #bbb;--field-border: 1px solid #ccc;--field-color: #333;--field-bg: white;--menu-border: 1px solid #999;--menu-bg: #bbb;--menu-shadow: 2px 3px 5px rgba(0,0,0,0.2);}@media (-webkit-min-device-pixel-ratio: 2) {body {--radius: 7px 7px 7px 7px;--spacing: 4px;--padding: 4px;--border-radius: 4px;}}</style>`;
   }
 }
 
