@@ -1,88 +1,131 @@
-// TODO: Documentation and tests
+// TODO: Improve tests.
 
-class Bindings {
-  constructor(instance) {
-    Object.defineProperty(this, 'instance', {value: instance, configurable: true});
+/** Manager for IoNode bindings. */
+class NodeBindings {
+  /**
+   * Creates binding manager for IoNode.
+   * @param {IoNode} node - Reference to the node/element itself.
+   */
+  constructor(node) {
+    Object.defineProperty(this, 'node', {value: node, configurable: true});
   }
+  /**
+   * Returns a binding to the specified property.
+   * @param {string} prop - property name.
+   * @return {Binding} Property binding.
+   */
   get(prop) {
-    this[prop] = this[prop] || new Binding(this.instance, prop);
+    this[prop] = this[prop] || new Binding(this.node, prop);
     return this[prop];
   }
+  /**
+   * Disposes all bindings.
+   * Use this when node is no longer needed.
+   */
   dispose() {
     for (let b in this) {
       this[b].dispose();
       delete this[b];
     }
-    delete this.instance;
+    delete this.node;
   }
 }
 
+/**
+ * Binding object. It manages data binding between source and targets using `[prop]-changed` events.
+ */
 class Binding {
-  constructor(source, sourceProp) {
-    this.source = source;
+  /**
+   * Creates a binding object with specified `sourceNode` and `sourceProp`.
+   * @param {IoNode} sourceNode - Source node.
+   * @param {string} sourceProp - Source property.
+   */
+  constructor(sourceNode, sourceProp) {
+    this.source = sourceNode;
     this.sourceProp = sourceProp;
     this.targets = [];
     this.targetsMap = new WeakMap();
     this.updateSource = this.updateSource.bind(this);
     this.updateTargets = this.updateTargets.bind(this);
-    this.setSource(this.source);
-  }
-  get value() {
-    return this.source[this.sourceProp];
-  }
-  set value(value) {
-    this.source[this.sourceProp] = value;
-  }
-  setSource() {
     this.source.addEventListener(this.sourceProp + '-changed', this.updateTargets);
-    for (let i = this.targets.length; i--;) {
-      const targetProps = this.targetsMap.get(this.targets[i]);
-      for (let j = targetProps.length; j--;) {
-        this.targets[i].__properties[targetProps[j]].value = this.source[this.sourceProp];
-        // TODO: test observers on binding hot-swap!
-      }
-    }
   }
-  setTarget(target, targetProp) {
-    if (this.targets.indexOf(target) === -1) this.targets.push(target);
-    if (this.targetsMap.has(target)) {
-      const targetProps = this.targetsMap.get(target);
-      if (targetProps.indexOf(targetProp) === -1) { // safe check needed?
+  /**
+   * Adds a target `targetNode` and `targetProp` and corresponding `[prop]-changed` listener, unless already added.
+   * @param {IoNode} targetNode - Target node.
+   * @param {string} targetProp - Target property.
+   */
+  addTarget(targetNode, targetProp) {
+    if (this.targets.indexOf(targetNode) === -1) this.targets.push(targetNode);
+    if (this.targetsMap.has(targetNode)) {
+      const targetProps = this.targetsMap.get(targetNode);
+      if (targetProps.indexOf(targetProp) === -1) {
         targetProps.push(targetProp);
-        target.addEventListener(targetProp + '-changed', this.updateSource);
+        targetNode.addEventListener(targetProp + '-changed', this.updateSource);
       }
     } else {
-      this.targetsMap.set(target, [targetProp]);
-      target.addEventListener(targetProp + '-changed', this.updateSource);
+      this.targetsMap.set(targetNode, [targetProp]);
+      targetNode.addEventListener(targetProp + '-changed', this.updateSource);
     }
   }
-  removeTarget(target, targetProp) {
-    if (this.targetsMap.has(target)) {
-      const targetProps = this.targetsMap.get(target);
+  /**
+   * Removes target `targetNode` and `targetProp` and corresponding `[prop]-changed` listener.
+   * If `targetProp` is not specified, it removes all target properties.
+   * @param {IoNode} targetNode - Target node.
+   * @param {string} targetProp - Target property.
+   */
+  removeTarget(targetNode, targetProp) {
+    if (this.targetsMap.has(targetNode)) {
+      const targetProps = this.targetsMap.get(targetNode);
       if (targetProp) {
         const index = targetProps.indexOf(targetProp);
         if (index !== -1) {
           targetProps.splice(index, 1);
         }
-        target.removeEventListener(targetProp + '-changed', this.updateSource);
+        targetNode.removeEventListener(targetProp + '-changed', this.updateSource);
       } else {
         for (let i = targetProps.length; i--;) {
-          target.removeEventListener(targetProps[i] + '-changed', this.updateSource);
+          targetNode.removeEventListener(targetProps[i] + '-changed', this.updateSource);
         }
         targetProps.length = 0;
       }
-      if (targetProps.length === 0) this.targets.splice(this.targets.indexOf(target), 1);
+      if (targetProps.length === 0) this.targets.splice(this.targets.indexOf(targetNode), 1);
     }
   }
+  /**
+   * Event handler that updates source property when one of the targets emits `[prop]-changed` event.
+   * @param {Object} event - Event object.
+   * @param {IoNode|HTMLElement} event.target - Event target (source node that emitted the event).
+   * @param {Object} event.detail - Event detail.
+   * @param {*} event.detail.value - New value.
+   */
   updateSource(event) {
-    if (this.targets.indexOf(event.target) === -1) return;
+    if (this.targets.indexOf(event.target) === -1) {
+      console.warn(
+        `io error: updateSource() should never fire when target is removed from binding.
+        Please file an issue at https://github.com/arodic/io/issues.`
+      );
+      return;
+    }
     const value = event.detail.value;
     if (this.source[this.sourceProp] !== value) {
       this.source[this.sourceProp] = value;
     }
   }
+  /**
+   * Event handler that updates bound properties on target nodes when source node emits `[prop]-changed` event.
+   * @param {Object} event - Event object.
+   * @param {IoNode|HTMLElement} event.target - Event target (source node that emitted the event).
+   * @param {Object} event.detail - Event detail.
+   * @param {*} event.detail.value - New value.
+   */
   updateTargets(event) {
-    if (event.target != this.source) return;
+    if (event.target != this.source) {
+      console.warn(
+        `io error: updateTargets() should always originate form source node.
+        Please file an issue at https://github.com/arodic/io/issues.`
+      );
+      return;
+    }
     const value = event.detail.value;
     for (let i = this.targets.length; i--;) {
       const targetProps = this.targetsMap.get(this.targets[i]);
@@ -96,7 +139,12 @@ class Binding {
       }
     }
   }
+  /**
+   * Dispose of the binding by removing all targets and listeners.
+   * Use this when node is no longer needed.
+   */
   dispose() {
+    this.source.removeEventListener(this.sourceProp + '-changed', this.updateTargets);
     for (let t in this.targets) {
       this.removeTarget(this.targets[t]);
       delete this.targets[t];
@@ -104,23 +152,93 @@ class Binding {
   }
 }
 
-// TODO: Documentation and tests
+// TODO: TEST
 
-class Listeners {
-  constructor(protochain = {}, instance) {
+/** Manager for IoNode event queue and change handle functions. */
+class NodeQueue extends Array {
+  /**
+   * Creates queue manager for IoNode.
+   * @param {IoNode} node - Reference to the node/element itself.
+   */
+  constructor(node) {
+    super();
+    Object.defineProperty(this, 'node', {value: node, configurable: true});
+  }
+  /**
+   * Add property change to the queue.
+   * @param {string} prop - Property name.
+   * @param {*} value Property value.
+   * @param {*} oldValue Old property value.
+   */
+  queue(prop, value, oldValue) {
+    const i = this.indexOf(prop);
+    if (i === -1) {
+      this.push(prop, {property: prop, value: value, oldValue: oldValue});
+    } else {
+      this[i + 1].value = value;
+    }
+  }
+  /**
+   * Dispatch the queue.
+   */
+  dispatch() {
+    const node = this.node;
+    if (this.length) {
+      for (let j = 0; j < this.length; j += 2) {
+        const prop = this[j];
+        const payload = {detail: this[j + 1]};
+        if (node[prop + 'Changed']) node[prop + 'Changed'](payload);
+        node.dispatchEvent(prop + '-changed', payload.detail);
+      }
+      // TODO: Evaluate performance and consider refactoring.
+      node.dispatchEvent('object-mutated', {object: node}, false, window);
+      node.changed();
+      this.length = 0;
+    }
+  }
+  /**
+   * Remove queue items and the node reference.
+   * Use this when node is no longer needed.
+   */
+  dispose() {
+    this.length = 0;
+    delete this.node;
+  }
+}
+
+// TODO: Improve tests.
+
+/** Creates a map of all listeners defined in the prototype chain. */
+class ProtoListeners {
+  /**
+   * @param {Array} protochain - Array of protochain constructors.
+   */
+  constructor(protochain) {
     for (let i = protochain.length; i--;) {
       const prop = protochain[i].constructor.listeners;
       for (let j in prop) this[j] = prop[j];
     }
-    Object.defineProperty(this, 'instance', {value: instance});
+  }
+}
+
+/** Manager for IoNode listeners. */
+class Listeners {
+  /**
+   * Creates listener manager for IoNode.
+   * @param {IoNode} node - Reference to the node/element itself.
+   * @param {ProtoListeners} protoListeners - List of listeners defined in the protochain.
+   */
+  constructor(node, protoListeners) {
+    // Copy listeners from protolisteners.
+    Object.defineProperty(this, 'node', {value: node});
     Object.defineProperty(this, 'propListeners', {value: {}});
     Object.defineProperty(this, 'activeListeners', {value: {}});
+    for (let prop in protoListeners) this[prop] = protoListeners[prop];
   }
-  clone(instance) {
-    const listeners = new Listeners({}, instance);
-    for (let prop in this) listeners[prop] = this[prop];
-    return listeners;
-  }
+  /**
+   * Sets listeners from properties (filtered form properties map by 'on-' prefix).
+   * @param {Object} props - Map of all properties.
+   */
   setPropListeners(props) {
     for (let l in this.propListeners) delete this.propListeners[l];
     for (let l in props) {
@@ -129,63 +247,90 @@ class Listeners {
       }
     }
   }
+  /**
+   * Adds all event listeners.
+   */
   connect() {
-    const instance = this.instance;
+    const node = this.node;
     const propListeners = this.propListeners;
     for (let i in this) {
-      const listener = typeof this[i] === 'function' ? this[i] : instance[this[i]];
-      instance.addEventListener(i, listener);
+      const listener = typeof this[i] === 'function' ? this[i] : node[this[i]];
+      node.addEventListener(i, listener);
     }
     for (let i in propListeners) {
-      const listener = typeof propListeners[i] === 'function' ? propListeners[i] : instance[propListeners[i]];
-      instance.addEventListener(i, listener);
+      const listener = typeof propListeners[i] === 'function' ? propListeners[i] : node[propListeners[i]];
+      node.addEventListener(i, listener);
     }
   }
+  /**
+   * Removes all event listeners.
+   */
   disconnect() {
-    const instance = this.instance;
+    const node = this.node;
     const propListeners = this.propListeners;
     for (let i in this) {
-      const listener = typeof this[i] === 'function' ? this[i] : instance[this[i]];
-      instance.removeEventListener(i, listener);
+      const listener = typeof this[i] === 'function' ? this[i] : node[this[i]];
+      node.removeEventListener(i, listener);
     }
     for (let i in propListeners) {
-      const listener = typeof propListeners[i] === 'function' ? propListeners[i] : instance[propListeners[i]];
-      instance.removeEventListener(i, listener);
+      const listener = typeof propListeners[i] === 'function' ? propListeners[i] : node[propListeners[i]];
+      node.removeEventListener(i, listener);
     }
   }
+  /**
+   * Removes all event listeners.
+   * Use this when node is no longer needed.
+   */
   dispose() {
     this.disconnect();
-    const instance = this.instance;
+    const node = this.node;
     const active = this.activeListeners;
     for (let i in active) {
       for (let j = active[i].length; j--;) {
-        if (instance.isElement) HTMLElement.prototype.removeEventListener.call(instance, i, active[i][j]);
+        if (node.isElement) HTMLElement.prototype.removeEventListener.call(node, i, active[i][j]);
         active[i].splice(j, 1);
       }
     }
   }
+  /**
+   * Adds an event listener.
+   * @param {string} type - event name to listen to.
+   * @param {function} listener - event handler function.
+   */
   addEventListener(type, listener) {
-    const instance = this.instance;
+    const node = this.node;
     const active = this.activeListeners;
     active[type] = active[type] || [];
     const i = active[type].indexOf(listener);
     if (i === - 1) {
-      if (instance.isElement) HTMLElement.prototype.addEventListener.call(instance, type, listener);
+      if (node.isElement) HTMLElement.prototype.addEventListener.call(node, type, listener);
       active[type].push(listener);
     }
   }
+  /**
+   * Removes an event listener.
+   * @param {string} type - event name to listen to.
+   * @param {function} listener - event handler function.
+   */
   removeEventListener(type, listener) {
-    const instance = this.instance;
+    const node = this.node;
     const active = this.activeListeners;
     if (active[type] !== undefined) {
       const i = active[type].indexOf(listener);
       if (i !== - 1) {
-        if (instance.isElement) HTMLElement.prototype.removeEventListener.call(instance, type, listener);
+        if (node.isElement) HTMLElement.prototype.removeEventListener.call(node, type, listener);
         active[type].splice(i, 1);
       }
     }
   }
-  dispatchEvent(type, detail = {}, bubbles = true, src = this.instance) {
+  /**
+   * Shorthand for event dispatch.
+   * @param {string} type - event name to dispatch.
+   * @param {Object} detail - event detail.
+   * @param {boolean} bubbles - event bubbles.
+   * @param {HTMLElement|IoNode} src source node/element to dispatch event from.
+   */
+  dispatchEvent(type, detail = {}, bubbles = true, src = this.node) {
     if (src instanceof HTMLElement || src === window) {
       HTMLElement.prototype.dispatchEvent.call(src, new CustomEvent(type, {type: type, detail: detail, bubbles: bubbles, composed: true}));
     } else {
@@ -194,18 +339,21 @@ class Listeners {
         const array = active[type].slice(0);
         for (let i = 0; i < array.length; i ++) {
           array[i].call(src, {detail: detail, target: src, path: [src]});
-          // TODO: consider bubbling
+          // TODO: consider bubbling.
         }
       }
     }
   }
 }
 
-// TODO: Documentation and tests
+// TODO: Improve tests and documentation.
 
-// Creates composed properties from all properties found in protochain.
-class Properties {
-  constructor(protochain = [], instance) {
+/** Creates a map of all property configurations defined in the prototype chain. */
+class ProtoProperties {
+  /**
+   * @param {Array} protochain Array of protochain constructors.
+   */
+  constructor(protochain) {
     const propertyDefs = {};
     for (let i = protochain.length; i--;) {
       const props = protochain[i].constructor.properties;
@@ -217,26 +365,40 @@ class Properties {
     for (let key in propertyDefs) {
       this[key] = new Property(propertyDefs[key]);
     }
-    Object.defineProperty(this, 'instance', {value: instance});
   }
-  // Creates a clone of properties for an instance.
-  clone(instance) {
-    const properties = new Properties([], instance);
-    for (let prop in this) {
-      properties[prop] = this[prop].clone();
-      if (typeof properties[prop].value === 'object') {
-        const value = properties[prop].value;
+}
 
-        if (value && value.isNode) value.connect(instance);
-
-        instance.queue(prop, value, undefined);
+/** Store for IoNode properties and their configurations. */
+class Properties {
+  /**
+   * Creates properties object for IoNode.
+   * @param {IoNode} node - Reference to the node/element itself.
+   * @param {ProtoProperties} protoProperties - List of property configurations defined in the protochain.
+   */
+  constructor(node, protoProperties) {
+    Object.defineProperty(this, 'node', {value: node});
+    for (let prop in protoProperties) {
+      this[prop] = protoProperties[prop].clone();
+      if (typeof this[prop].value === 'object') {
+        const value = this[prop].value;
+        if (value && value.isNode) value.connect(node);
+        node.queue(prop, value, undefined);
       }
     }
-    return properties;
   }
+  /**
+   * Gets specified property value.
+   * @param {string} prop - Property name.
+   * @return {*} Property value.
+   */
   get(prop) {
     return this[prop].value;
   }
+  /**
+   * Sets specified property value.
+   * @param {string} prop - Property name.
+   * @param {*} value Property value.
+   */
   set(prop, value) {
 
     let oldBinding = this[prop].binding;
@@ -245,10 +407,10 @@ class Properties {
     let binding = (value instanceof Binding) ? value : null;
 
     if (binding && oldBinding && binding !== oldBinding) {
-      oldBinding.removeTarget(this.instance, prop); // TODO: test extensively
+      oldBinding.removeTarget(this.node, prop); // TODO: test extensively
     }
     if (binding) {
-      binding.setTarget(this.instance, prop);
+      binding.addTarget(this.node, prop);
       this[prop].binding = binding;
       this[prop].value = value.source[value.sourceProp];
       value = value.source[value.sourceProp];
@@ -257,35 +419,45 @@ class Properties {
     }
 
     if (value && value.isNode) {
-      value.connect(this.instance);
+      value.connect(this.node);
     }
 
     if (value !== oldValue && oldValue && oldValue.isNode) {
-      oldValue.disconnect(this.instance);
+      oldValue.disconnect(this.node);
     }
 
-    if (this[prop].reflect) this.instance.setAttribute(prop, value);
+    if (this[prop].reflect) this.node.setAttribute(prop, value);
   }
   // TODO: test dispose and disconnect for memory leaks!!
   // TODO: dispose bindings properly
+  /**
+   * Connects value bindings if defined.
+   */
   connect() {
     for (let p in this) {
       if (this[p].binding) {
-        this[p].binding.setTarget(this.instance, p); //TODO: test
+        this[p].binding.addTarget(this.node, p); //TODO: test
       }
     }
   }
+  /**
+   * Disonnects value bindings if defined.
+   */
   disconnect() {
     for (let p in this) {
       if (this[p].binding) {
-        this[p].binding.removeTarget(this.instance, p);
+        this[p].binding.removeTarget(this.node, p);
       }
     }
   }
+  /**
+   * Disonnects bindings and removes all property configurations.
+   * Use this when node is no longer needed.
+   */
   dispose() {
     for (let p in this) {
       if (this[p].binding) {
-        this[p].binding.removeTarget(this.instance, p);
+        this[p].binding.removeTarget(this.node, p);
         delete this[p].binding;
       }
       delete this[p];
@@ -293,41 +465,48 @@ class Properties {
   }
 }
 
-/*
- Creates a property configuration object with following properties:
- {
-   value: default value.
-   type: constructor of value.
-   reflect: reflects to HTML attribute
-   binding: binding object.
-   enumerable: makes property enumerable.
- }
+/**
+ * Property configuration.
  */
-
 class Property {
-  constructor(propDef) {
-    if (propDef === null || propDef === undefined) {
-      propDef = {value: propDef};
-    } else if (typeof propDef === 'function') {
-      propDef = {type: propDef};
-    } else if (propDef instanceof Array) {
-      propDef = {type: Array, value: [...propDef]};
-    } else if (propDef instanceof Binding) {
-      propDef = {binding: propDef, value: propDef.value};
-    } else if (typeof propDef !== 'object') {
-      propDef = {value: propDef, type: propDef.constructor};
+  /**
+  * Creates a property configuration object with following properties:
+  * @param {Object} config - Configuration object.
+  * @param {*} config.value - Default value.
+  * @param {function} config.type - Constructor of value.
+  * @param {boolean} config.reflect - Reflects to HTML attribute
+  * @param {Binding} config.binding - Binding object.
+  * @param {boolean} config.enumerable - Makes property enumerable.
+  */
+  constructor(config) {
+    if (config === null || config === undefined) {
+      config = {value: config};
+    } else if (typeof config === 'function') {
+      config = {type: config};
+    } else if (config instanceof Array) {
+      config = {type: Array, value: [...config]};
+    } else if (config instanceof Binding) {
+      config = {binding: config, value: config.value};
+    } else if (typeof config !== 'object') {
+      config = {value: config, type: config.constructor};
     }
-    this.assign(propDef);
+    this.assign(config);
   }
-  // Helper function to assign new values as we walk up the inheritance chain.
-  assign(propDef) {
-    if (propDef.value !== undefined) this.value = propDef.value;
-    if (propDef.type !== undefined) this.type = propDef.type;
-    if (propDef.reflect !== undefined) this.reflect = propDef.reflect;
-    if (propDef.binding !== undefined) this.binding = propDef.binding;
-    this.enumerable = propDef.enumerable !== undefined ? propDef.enumerable : true;
+  /**
+   * Helper function to assign new values as we walk up the inheritance chain.
+   * @param {Object} config - Configuration object.
+   */
+  assign(config) {
+    if (config.value !== undefined) this.value = config.value;
+    if (config.type !== undefined) this.type = config.type;
+    if (config.reflect !== undefined) this.reflect = config.reflect;
+    if (config.binding !== undefined) this.binding = config.binding;
+    this.enumerable = config.enumerable !== undefined ? config.enumerable : true;
   }
-  // Clones the property. If property value is objects it does one level deep object clone.
+  /**
+   * Clones the property. If property value is objects it does one level deep object clone.
+   * @return {Property} - Property configuration.
+   */
   clone() {
     const prop = new Property(this);
     if (prop.type === undefined && prop.value !== undefined && prop.value !== null) {
@@ -351,47 +530,9 @@ class Property {
   }
 }
 
-// TODO: Documentation and tests
+// TODO: Improve tests and documentation.
 
-class Queue extends Array {
-  constructor(instance) {
-    super();
-    Object.defineProperty(this, 'instance', {value: instance, configurable: true});
-  }
-  queue(prop, value, oldValue) {
-    const i = this.indexOf(prop);
-    if (i === -1) {
-      this.push(prop, {property: prop, value: value, oldValue: oldValue});
-    } else {
-      this[i + 1].value = value;
-    }
-  }
-  dispatch() {
-    const instance = this.instance;
-    if (this.length) {
-      for (let j = 0; j < this.length; j += 2) {
-        const prop = this[j];
-        const payload = {detail: this[j + 1]};
-        if (instance[prop + 'Changed']) instance[prop + 'Changed'](payload);
-        instance.dispatchEvent(prop + '-changed', payload.detail);
-      }
-      instance.changed();
-      if (!(instance.isElement)) {
-        // Emit change ecent for non-elements (nodes)
-        instance.dispatchEvent('object-mutated', {object: instance}, null, window);
-      }
-      this.length = 0;
-    }
-  }
-  dispose() {
-    this.length = 0;
-    delete this.instance;
-  }
-}
-
-// TODO: Improve documentation and tests
-
-const IoCoreMixin = (superclass) => {
+const IoNodeMixin = (superclass) => {
   const classConstructor = class extends superclass {
     static get properties() {
       return {};
@@ -404,10 +545,11 @@ const IoCoreMixin = (superclass) => {
 
       if (!this.constructor.prototype.__registered) this.constructor.Register();
 
-      Object.defineProperty(this, '__queue', {value: new Queue(this)});
-      Object.defineProperty(this, '__bindings', {value: new Bindings(this)});
-      Object.defineProperty(this, '__properties', {value: this.__properties.clone(this)});
-      Object.defineProperty(this, '__listeners', {value: this.__listeners.clone(this)});
+      Object.defineProperty(this, '__nodeBindings', {value: new NodeBindings(this)});
+      Object.defineProperty(this, '__nodeQueue', {value: new NodeQueue(this)});
+
+      Object.defineProperty(this, '__properties', {value: new Properties(this, this.__protoProperties)});
+      Object.defineProperty(this, '__listeners', {value: new Listeners(this, this.__protoListeners)});
 
       for (let i = 0; i < this.__functions.length; i++) {
         this[this.__functions[i]] = this[this.__functions[i]].bind(this);
@@ -415,7 +557,7 @@ const IoCoreMixin = (superclass) => {
 
       this.__listeners.setPropListeners(initProps, this);
 
-      // TODO: test and documentation
+      // TODO: Test and documentation.
       if (this.compose) this.applyCompose(this.compose);
 
       this.setProperties(initProps);
@@ -440,7 +582,7 @@ const IoCoreMixin = (superclass) => {
     }
     changed() {}
     bind(prop) {
-      return this.__bindings.get(prop);
+      return this.__nodeBindings.get(prop);
     }
     set(prop, value) {
       if (this[prop] !== value) {
@@ -466,17 +608,18 @@ const IoCoreMixin = (superclass) => {
           this.style.setProperty(s, props['style'][s]);
         }
       }
-      // TODO: consider postpoining dispatch for unconnected elements.
+      // TODO: Consider postpoining dispatch for unconnected elements.
       // if (this.__connected) this.queueDispatch();
       this.queueDispatch();
     }
-    // TODO: test extensively
+    // TODO: Test extensively.
     applyCompose(nodes) {
       for (let n in nodes) {
         const properties = nodes[n];
         this[n].setProperties(properties);
         this.addEventListener(n + '-changed', (event) => {
-          if (event.detail.oldValue) event.detail.oldValue.dispose(); // TODO: test
+          // TODO: Test.
+          if (event.detail.oldValue) event.detail.oldValue.dispose();
           event.detail.value.setProperties(properties);
         });
       }
@@ -510,8 +653,8 @@ const IoCoreMixin = (superclass) => {
       }
     }
     dispose() {
-      this.__queue.dispose();
-      this.__bindings.dispose();
+      this.__nodeQueue.dispose();
+      this.__nodeBindings.dispose();
       this.__listeners.dispose();
       this.__properties.dispose();
     }
@@ -521,14 +664,14 @@ const IoCoreMixin = (superclass) => {
     removeEventListener(type, listener) {
       this.__listeners.removeEventListener(type, listener);
     }
-    dispatchEvent(type, detail, bubbles, src) {
+    dispatchEvent(type, detail, bubbles = false, src) {
       this.__listeners.dispatchEvent(type, detail, bubbles, src);
     }
     queue(prop, value, oldValue) {
-      this.__queue.queue(prop, value, oldValue);
+      this.__nodeQueue.queue(prop, value, oldValue);
     }
     queueDispatch() {
-      this.__queue.dispatch();
+      this.__nodeQueue.dispatch();
     }
   };
   classConstructor.Register = Register;
@@ -547,10 +690,11 @@ const Register = function () {
   Object.defineProperty(this.prototype, 'isElement', {value: proto.constructor === HTMLElement});
 
   Object.defineProperty(this.prototype, '__protochain', {value: protochain});
+  Object.defineProperty(this.prototype, '__protoProperties', {value: new ProtoProperties(this.prototype.__protochain)});
+  Object.defineProperty(this.prototype, '__protoListeners', {value: new ProtoListeners(this.prototype.__protochain)});
 
-
-  Object.defineProperty(this.prototype, '__properties', {value: new Properties(this.prototype.__protochain)});
-  Object.defineProperty(this.prototype, '__listeners', {value: new Listeners(this.prototype.__protochain)});
+  // TODO: Unhack
+  Object.defineProperty(this.prototype, '__properties', {value: this.prototype.__protoProperties});
 
   const functions = [];
   for (let i = this.prototype.__protochain.length; i--;) {
@@ -568,14 +712,14 @@ const Register = function () {
 
   Object.defineProperty(this.prototype, '__objectProps', {value: []});
   const ignore = [Boolean, String, Number, HTMLElement, Function, undefined];
-  for (let prop in this.prototype.__properties) {
-    let type = this.prototype.__properties[prop].type;
+  for (let prop in this.prototype.__protoProperties) {
+    let type = this.prototype.__protoProperties[prop].type;
     if (ignore.indexOf(type) == -1) this.prototype.__objectProps.push(prop);
   }
 
-  for (let prop in this.prototype.__properties) {
+  for (let prop in this.prototype.__protoProperties) {
     const isPublic = prop.charAt(0) !== '_';
-    const isEnumerable = !(this.prototype.__properties[prop].enumerable === false);
+    const isEnumerable = !(this.prototype.__protoProperties[prop].enumerable === false);
     Object.defineProperty(this.prototype, prop, {
       get: function() {
         return this.__properties[prop].value;
@@ -596,13 +740,13 @@ const Register = function () {
   }
 };
 
-IoCoreMixin.Register = Register;
+IoNodeMixin.Register = Register;
 
-class IoNode extends IoCoreMixin(Object) {}
+class IoNode extends IoNodeMixin(Object) {}
 
-// TODO: Documentation and tests
+// TODO: Improve tests and documentation.
 
-class IoElement extends IoCoreMixin(HTMLElement) {
+class IoElement extends IoNodeMixin(HTMLElement) {
   static get properties() {
     return {
       id: {
@@ -683,14 +827,15 @@ class IoElement extends IoCoreMixin(HTMLElement) {
       if (child.dispose) child.dispose();
     }
     // create new elements after existing
-    const frag = document.createDocumentFragment();
-    for (let i = children.length; i < vChildren.length; i++) {
-      frag.appendChild(constructElement(vChildren[i]));
+    if (children.length < vChildren.length) {
+      const frag = document.createDocumentFragment();
+      for (let i = children.length; i < vChildren.length; i++) {
+        frag.appendChild(constructElement(vChildren[i]));
+      }
+      host.appendChild(frag);
     }
-    host.appendChild(frag);
 
     for (let i = 0; i < children.length; i++) {
-
       // replace existing elements
       if (children[i].localName !== vChildren[i].name) {
         const oldElement = children[i];
@@ -707,10 +852,11 @@ class IoElement extends IoCoreMixin(HTMLElement) {
         children[i].className = '';
         // Io Elements
         if (children[i].hasOwnProperty('__properties')) {
-          // WARNING TODO: better property and listeners reset.
-          // WARNING TODO: test property and listeners reset
+          // WARNING TODO: Better property and listeners reset.
+          // WARNING TODO: Test property and listeners reset.
           children[i].setProperties(vChildren[i].props);
-          // children[i].queueDispatch(); // TODO: test and remove. Redundant with setProperties()
+          // TODO: Test and remove. Redundant with setProperties().
+          // children[i].queueDispatch();
           children[i].__listeners.setPropListeners(vChildren[i].props, children[i]);
           children[i].__listeners.connect();
         // Native HTML Elements
@@ -724,7 +870,7 @@ class IoElement extends IoCoreMixin(HTMLElement) {
             }
             else children[i][prop] = vChildren[i].props[prop];
           }
-          // TODO: refactor for native elements
+          // TODO: Refactor for native elements.
           children[i].__listeners.setPropListeners(vChildren[i].props, children[i]);
           children[i].__listeners.connect();
           ///
@@ -764,9 +910,7 @@ Please try <a href="https://www.mozilla.org/en-US/firefox/new/">Firefox</a>,
 
 IoElement.Register = function() {
 
-  IoCoreMixin.Register.call(this);
-
-  // window[this.name] = this; // TODO: consider
+  IoNodeMixin.Register.call(this);
 
   const localName = this.name.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
 
@@ -824,8 +968,8 @@ const constructElement = function(vDOMNode) {
      }
    } else element[prop] = vDOMNode.props[prop];
  }
- /// TODO: refactor for native elements
- Object.defineProperty(element, '__listeners', {value: new Listeners({}, element)});
+ // TODO: Refactor for native elements
+ Object.defineProperty(element, '__listeners', {value: new Listeners(element)});
  element.__listeners.setPropListeners(vDOMNode.props, element);
  element.__listeners.connect();
 
@@ -1030,7 +1174,7 @@ class IoProperties extends IoElement {
       this.dispatchEvent('value-set', detail, false);
     }
   }
-  // TODO: considet valueMutated() instead
+  // TODO: Consider valueMutated() instead
   changed() {
     const config = this._config;
     const elements = [];
@@ -1081,7 +1225,13 @@ class Config {
 
     let proto = object.__proto__;
     while (proto) {
-      keys.push(...Object.keys(proto));
+      if (proto.constructor !== HTMLElement
+          && proto.constructor !== Element
+          && proto.constructor !== Node
+          && proto.constructor !== EventTarget
+          && proto.constructor !== Object) {
+        keys.push(...Object.keys(proto));
+      }
       prototypes.push(proto.constructor.name);
       proto = proto.__proto__;
     }
@@ -1272,7 +1422,7 @@ const shadersCache = new WeakMap();
 
 class IoCanvas extends IoElement {
   static get style() {
-    return html`<style>:host {box-sizing: border-box;overflow: hidden;position: relative;border: 1px solid black;}:host canvas {position: absolute;top: 0px;left: 0px;touch-action: none;user-select: none;}</style>`;
+    return html`<style>:host {box-sizing: border-box;overflow: hidden;position: relative;border: 1px solid black;}:host > canvas {position: absolute;top: 0px;left: 0px;touch-action: none;user-select: none;}</style>`;
   }
   static get properties() {
     return {
@@ -1411,7 +1561,7 @@ class IoCollapsable extends IoElement {
   changed() {
     this.template([
       ['io-boolean', {true: this.label, false: this.label, value: this.bind('expanded')}],
-      this.expanded ? ['div', {className: 'io-collapsable-content'}, this.elements] : null
+      (this.expanded && this.elements.length) ? ['div', {className: 'io-collapsable-content'}, this.elements] : null
     ]);
   }
 }
@@ -2509,6 +2659,10 @@ class IoSelector extends IoElement {
         type: Boolean,
         reflect: true
       },
+      role: {
+        type: String,
+        reflect: false
+      }
     };
   }
   resized() {
@@ -2538,6 +2692,7 @@ class IoSelector extends IoElement {
         selected: this.selected,
         cache: this.cache,
         precache: this.precache,
+        role: this.role,
       }],
     ]);
   }
@@ -2547,7 +2702,7 @@ IoSelector.Register();
 
 class IoSlider extends IoElement {
   static get style() {
-    return html`<style>:host {display: flex;flex-direction: row;min-width: 12em;}:host > io-number {flex: 0 0 auto;}:host > io-slider-knob {flex: 1 1 auto;margin-left: var(--io-theme-spacing);border-radius: 2px;}</style>`;}static get properties() {return {value: 0,step: 0.001,min: 0,max: 1,strict: true,};}_onValueSet(event) {this.dispatchEvent('value-set', event.detail, false);this.value = event.detail.value;}changed() {const charLength = (Math.max(Math.max(String(this.min).length, String(this.max).length), String(this.step).length));this.template([['io-number', {value: this.value, step: this.step, min: this.min, max: this.max, strict: this.strict, id: 'number', 'on-value-set': this._onValueSet}],['io-slider-knob', {value: this.value, step: this.step, minValue: this.min, maxValue: this.max, id: 'slider', 'on-value-set': this._onValueSet}]]);this.$.number.style.setProperty('min-width', charLength + 'em');}}IoSlider.Register();class IoSliderKnob extends IoCanvas {static get style() {return html`<style>:host {display: flex;cursor: ew-resize;touch-action: none;}:host > img {pointer-events: none;touch-action: none;}</style>`;
+    return html`<style>:host {display: flex;flex-direction: row;min-width: 12em;}:host > io-number {flex: 0 0 3.75em;}:host > io-slider-knob {flex: 1 1 auto;margin-left: var(--io-theme-spacing);border-radius: 2px;}</style>`;}static get properties() {return {value: 0,step: 0.001,min: 0,max: 1,strict: true,};}_onValueSet(event) {this.dispatchEvent('value-set', event.detail, false);this.value = event.detail.value;}changed() {this.template([['io-number', {value: this.value, step: this.step, min: this.min, max: this.max, strict: this.strict, id: 'number', 'on-value-set': this._onValueSet}],['io-slider-knob', {value: this.value, step: this.step, minValue: this.min, maxValue: this.max, id: 'slider', 'on-value-set': this._onValueSet}]]);}}IoSlider.Register();class IoSliderKnob extends IoCanvas {static get style() {return html`<style>:host {display: flex;cursor: ew-resize;touch-action: none;}:host > canvas {pointer-events: none;touch-action: none;}</style>`;
   }
   static get properties() {
     return {
@@ -2699,4 +2854,4 @@ IoTheme.Register();
  * @author arodic / https://github.com/arodic
  */
 
-export { IoCoreMixin, IoNode, IoElement, html, initStyle, Binding, Bindings, IoServiceLoader, IoStorage, nodes as storageNodes, IoArray, IoBoolean, IoButton, IoCanvas, IoCollapsable, IoElementCache, IoInspector, IoInspectorBreadcrumbs, IoInspectorLink, IoMdView, IoMenuItem, IoMenuLayer, IoMenuOptions, IoMenu, IoNumber, IoObject, IoOption, IoProperties, IoTabs, IoSelector, IoSlider, IoString, IoTheme };
+export { IoNodeMixin, IoNode, IoElement, html, initStyle, Binding, NodeBindings, IoServiceLoader, IoStorage, nodes as storageNodes, IoArray, IoBoolean, IoButton, IoCanvas, IoCollapsable, IoElementCache, IoInspector, IoInspectorBreadcrumbs, IoInspectorLink, IoMdView, IoMenuItem, IoMenuLayer, IoMenuOptions, IoMenu, IoNumber, IoObject, IoOption, IoProperties, IoTabs, IoSelector, IoSlider, IoString, IoTheme };
