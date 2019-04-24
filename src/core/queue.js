@@ -1,10 +1,21 @@
-// TODO: Documentation and tests
+// TODO: TEST
 
-export class Queue extends Array {
-  constructor(instance) {
+/** Manager for IoNode event queue and change handle functions. */
+export class NodeQueue extends Array {
+  /**
+   * Creates queue manager for IoNode.
+   * @param {IoNode} node - Reference to the node/element itself.
+   */
+  constructor(node) {
     super();
-    Object.defineProperty(this, 'instance', {value: instance, configurable: true});
+    Object.defineProperty(this, 'node', {value: node, configurable: true});
   }
+  /**
+   * Add property change to the queue.
+   * @param {string} prop - Property name.
+   * @param {*} value Property value.
+   * @param {*} oldValue Old property value.
+   */
   queue(prop, value, oldValue) {
     const i = this.indexOf(prop);
     if (i === -1) {
@@ -13,25 +24,30 @@ export class Queue extends Array {
       this[i + 1].value = value;
     }
   }
+  /**
+   * Dispatch the queue.
+   */
   dispatch() {
-    const instance = this.instance;
+    const node = this.node;
     if (this.length) {
       for (let j = 0; j < this.length; j += 2) {
         const prop = this[j];
         const payload = {detail: this[j + 1]};
-        if (instance[prop + 'Changed']) instance[prop + 'Changed'](payload);
-        instance.dispatchEvent(prop + '-changed', payload.detail);
+        if (node[prop + 'Changed']) node[prop + 'Changed'](payload);
+        node.dispatchEvent(prop + '-changed', payload.detail);
       }
-      instance.changed();
-      if (!(instance.isElement)) {
-        // Emit change ecent for non-elements (nodes)
-        instance.dispatchEvent('object-mutated', {object: instance}, null, window);
-      }
+      // TODO: Evaluate performance and consider refactoring.
+      node.dispatchEvent('object-mutated', {object: node}, false, window);
+      node.changed();
       this.length = 0;
     }
   }
+  /**
+   * Remove queue items and the node reference.
+   * Use this when node is no longer needed.
+   */
   dispose() {
     this.length = 0;
-    delete this.instance;
+    delete this.node;
   }
 }

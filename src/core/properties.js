@@ -1,10 +1,13 @@
 import {Binding} from "./bindings.js";
 
-// TODO: Documentation and tests
+// TODO: Improve tests and documentation.
 
-// Creates composed properties from all properties found in protochain.
-export class Properties {
-  constructor(protochain = [], instance) {
+/** Creates a map of all property configurations defined in the prototype chain. */
+export class ProtoProperties {
+  /**
+   * @param protochain {Array} Array of protochain constructors.
+   */
+  constructor(protochain) {
     const propertyDefs = {};
     for (let i = protochain.length; i--;) {
       const props = protochain[i].constructor.properties;
@@ -16,26 +19,39 @@ export class Properties {
     for (let key in propertyDefs) {
       this[key] = new Property(propertyDefs[key]);
     }
-    Object.defineProperty(this, 'instance', {value: instance});
   }
-  // Creates a clone of properties for an instance.
-  clone(instance) {
-    const properties = new Properties([], instance);
-    for (let prop in this) {
-      properties[prop] = this[prop].clone();
-      if (typeof properties[prop].value === 'object') {
-        const value = properties[prop].value;
+}
 
-        if (value && value.isNode) value.connect(instance);
-
-        instance.queue(prop, value, undefined);
+/** Store for IoNode properties and their configurations. */
+export class Properties {
+  /**
+   * Creates properties object for IoNode.
+   * @param {IoNode} node - Reference to the node/element itself.
+   * @param {ProtoProperties} protoProperties - List of property configurations defined in the protochain.
+   */
+  constructor(node, protoProperties) {
+    Object.defineProperty(this, 'node', {value: node});
+    for (let prop in protoProperties) {
+      this[prop] = protoProperties[prop].clone();
+      if (typeof this[prop].value === 'object') {
+        const value = this[prop].value;
+        if (value && value.isNode) value.connect(node);
+        node.queue(prop, value, undefined);
       }
     }
-    return properties;
   }
+  /**
+   * Gets specified property value.
+   * @param {string} prop - Property name.
+   */
   get(prop) {
     return this[prop].value;
   }
+  /**
+   * Sets specified property value.
+   * @param {string} prop - Property name.
+   * @param {*} value Property value.
+   */
   set(prop, value) {
 
     let oldBinding = this[prop].binding;
@@ -44,10 +60,10 @@ export class Properties {
     let binding = (value instanceof Binding) ? value : null;
 
     if (binding && oldBinding && binding !== oldBinding) {
-      oldBinding.removeTarget(this.instance, prop); // TODO: test extensively
+      oldBinding.removeTarget(this.node, prop); // TODO: test extensively
     }
     if (binding) {
-      binding.setTarget(this.instance, prop);
+      binding.addTarget(this.node, prop);
       this[prop].binding = binding;
       this[prop].value = value.source[value.sourceProp];
       value = value.source[value.sourceProp];
@@ -56,35 +72,45 @@ export class Properties {
     }
 
     if (value && value.isNode) {
-      value.connect(this.instance);
+      value.connect(this.node);
     }
 
     if (value !== oldValue && oldValue && oldValue.isNode) {
-      oldValue.disconnect(this.instance);
+      oldValue.disconnect(this.node);
     }
 
-    if (this[prop].reflect) this.instance.setAttribute(prop, value);
+    if (this[prop].reflect) this.node.setAttribute(prop, value);
   }
   // TODO: test dispose and disconnect for memory leaks!!
   // TODO: dispose bindings properly
+  /**
+   * Connects value bindings if defined.
+   */
   connect() {
     for (let p in this) {
       if (this[p].binding) {
-        this[p].binding.setTarget(this.instance, p); //TODO: test
+        this[p].binding.addTarget(this.node, p); //TODO: test
       }
     }
   }
+  /**
+   * Disonnects value bindings if defined.
+   */
   disconnect() {
     for (let p in this) {
       if (this[p].binding) {
-        this[p].binding.removeTarget(this.instance, p);
+        this[p].binding.removeTarget(this.node, p);
       }
     }
   }
+  /**
+   * Disonnects bindings and removes all property configurations.
+   * Use this when node is no longer needed.
+   */
   dispose() {
     for (let p in this) {
       if (this[p].binding) {
-        this[p].binding.removeTarget(this.instance, p);
+        this[p].binding.removeTarget(this.node, p);
         delete this[p].binding;
       }
       delete this[p];
@@ -92,18 +118,19 @@ export class Properties {
   }
 }
 
-/*
- Creates a property configuration object with following properties:
- {
-   value: default value.
-   type: constructor of value.
-   reflect: reflects to HTML attribute
-   binding: binding object.
-   enumerable: makes property enumerable.
- }
+/**
+ * Property configuration.
  */
-
 class Property {
+  /**
+  * Creates a property configuration object with following properties:
+  * @param {Object} config - Configuration object.
+  * @param {*} config.value - Default value.
+  * @param {function} config.type - Constructor of value.
+  * @param {boolean} config.reflect - Reflects to HTML attribute
+  * @param {Binding} config.binding - Binding object.
+  * @param {boolean} config.enumerable - Makes property enumerable.
+  */
   constructor(propDef) {
     if (propDef === null || propDef === undefined) {
       propDef = {value: propDef};
@@ -118,7 +145,9 @@ class Property {
     }
     this.assign(propDef);
   }
-  // Helper function to assign new values as we walk up the inheritance chain.
+  /**
+   * Helper function to assign new values as we walk up the inheritance chain.
+   */
   assign(propDef) {
     if (propDef.value !== undefined) this.value = propDef.value;
     if (propDef.type !== undefined) this.type = propDef.type;
@@ -126,7 +155,9 @@ class Property {
     if (propDef.binding !== undefined) this.binding = propDef.binding;
     this.enumerable = propDef.enumerable !== undefined ? propDef.enumerable : true;
   }
-  // Clones the property. If property value is objects it does one level deep object clone.
+  /**
+   * Clones the property. If property value is objects it does one level deep object clone.
+   */
   clone() {
     const prop = new Property(this);
     if (prop.type === undefined && prop.value !== undefined && prop.value !== null) {

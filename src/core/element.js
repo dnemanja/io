@@ -1,9 +1,9 @@
-import {IoCoreMixin} from "./core.js";
+import {IoNodeMixin} from "./node.js";
 import {Listeners} from "./listeners.js";
 
-// TODO: Documentation and tests
+// TODO: Improve tests and documentation.
 
-export class IoElement extends IoCoreMixin(HTMLElement) {
+export class IoElement extends IoNodeMixin(HTMLElement) {
   static get properties() {
     return {
       id: {
@@ -84,14 +84,15 @@ export class IoElement extends IoCoreMixin(HTMLElement) {
       if (child.dispose) child.dispose();
     }
     // create new elements after existing
-    const frag = document.createDocumentFragment();
-    for (let i = children.length; i < vChildren.length; i++) {
-      frag.appendChild(constructElement(vChildren[i]));
+    if (children.length < vChildren.length) {
+      const frag = document.createDocumentFragment();
+      for (let i = children.length; i < vChildren.length; i++) {
+        frag.appendChild(constructElement(vChildren[i]));
+      }
+      host.appendChild(frag);
     }
-    host.appendChild(frag);
 
     for (let i = 0; i < children.length; i++) {
-
       // replace existing elements
       if (children[i].localName !== vChildren[i].name) {
         const oldElement = children[i];
@@ -108,10 +109,11 @@ export class IoElement extends IoCoreMixin(HTMLElement) {
         children[i].className = '';
         // Io Elements
         if (children[i].hasOwnProperty('__properties')) {
-          // WARNING TODO: better property and listeners reset.
-          // WARNING TODO: test property and listeners reset
+          // WARNING TODO: Better property and listeners reset.
+          // WARNING TODO: Test property and listeners reset.
           children[i].setProperties(vChildren[i].props);
-          // children[i].queueDispatch(); // TODO: test and remove. Redundant with setProperties()
+          // TODO: Test and remove. Redundant with setProperties().
+          // children[i].queueDispatch();
           children[i].__listeners.setPropListeners(vChildren[i].props, children[i]);
           children[i].__listeners.connect();
         // Native HTML Elements
@@ -125,7 +127,7 @@ export class IoElement extends IoCoreMixin(HTMLElement) {
             }
             else children[i][prop] = vChildren[i].props[prop];
           }
-          // TODO: refactor for native elements
+          // TODO: Refactor for native elements.
           children[i].__listeners.setPropListeners(vChildren[i].props, children[i]);
           children[i].__listeners.connect();
           ///
@@ -165,9 +167,7 @@ Please try <a href="https://www.mozilla.org/en-US/firefox/new/">Firefox</a>,
 
 IoElement.Register = function() {
 
-  IoCoreMixin.Register.call(this);
-
-  // window[this.name] = this; // TODO: consider
+  IoNodeMixin.Register.call(this);
 
   const localName = this.name.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
 
@@ -225,8 +225,8 @@ const constructElement = function(vDOMNode) {
      }
    } else element[prop] = vDOMNode.props[prop];
  }
- /// TODO: refactor for native elements
- Object.defineProperty(element, '__listeners', {value: new Listeners({}, element)});
+ // TODO: Refactor for native elements
+ Object.defineProperty(element, '__listeners', {value: new Listeners(element)});
  element.__listeners.setPropListeners(vDOMNode.props, element);
  element.__listeners.connect();
 
