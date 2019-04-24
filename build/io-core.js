@@ -191,7 +191,9 @@ class NodeQueue extends Array {
         node.dispatchEvent(prop + '-changed', payload.detail);
       }
       // TODO: Evaluate performance and consider refactoring.
-      node.dispatchEvent('object-mutated', {object: node}, false, window);
+      if (node.isNode && !node.isElement) {
+        node.dispatchEvent('object-mutated', {object: node}, false, window);
+      }
       node.changed();
       this.length = 0;
     }
