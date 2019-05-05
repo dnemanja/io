@@ -1,10 +1,10 @@
 // TODO: Improve tests.
 
-/** Manager for IoNode bindings. */
+/** Manager for `IoNode` and `IoElement` bindings. */
 class NodeBindings {
   /**
-   * Creates binding manager for IoNode.
-   * @param {IoNode} node - Reference to the node/element itself.
+   * Creates binding manager for `IoNode`.
+   * @param {IoNode|IoElement} node - Reference to the node/element itself.
    */
   constructor(node) {
     Object.defineProperty(this, 'node', {value: node, configurable: true});
@@ -152,12 +152,12 @@ class Binding {
   }
 }
 
-// TODO: TEST
+// TODO: Improve tests.
 
-/** Manager for IoNode event queue and change handle functions. */
+/** Manager for `IoNode` event queue and change handle functions. */
 class NodeQueue extends Array {
   /**
-   * Creates queue manager for IoNode.
+   * Creates queue manager for `IoNode`.
    * @param {IoNode} node - Reference to the node/element itself.
    */
   constructor(node) {
@@ -223,10 +223,10 @@ class ProtoListeners {
   }
 }
 
-/** Manager for IoNode listeners. */
+/** Manager for `IoNode` listeners. */
 class Listeners {
   /**
-   * Creates listener manager for IoNode.
+   * Creates listener manager for `IoNode`.
    * @param {IoNode} node - Reference to the node/element itself.
    * @param {ProtoListeners} protoListeners - List of listeners defined in the protochain.
    */
@@ -250,7 +250,7 @@ class Listeners {
     }
   }
   /**
-   * Adds all event listeners.
+   * Adds event listeners.
    */
   connect() {
     const node = this.node;
@@ -265,7 +265,7 @@ class Listeners {
     }
   }
   /**
-   * Removes all event listeners.
+   * Removes event listeners.
    */
   disconnect() {
     const node = this.node;
@@ -348,7 +348,7 @@ class Listeners {
   }
 }
 
-// TODO: Improve tests and documentation.
+// TODO: Improve tests.
 
 /** Creates a map of all property configurations defined in the prototype chain. */
 class ProtoProperties {
@@ -368,12 +368,18 @@ class ProtoProperties {
       this[key] = new Property(propertyDefs[key]);
     }
   }
+  get(prop) {
+    console.warn('Property', prop, 'cannot be get before instance is constructed.');
+  }
+  set(prop) {
+    console.warn('Property', prop, 'cannot be set before instance is constructed.');
+  }
 }
 
-/** Store for IoNode properties and their configurations. */
+/** Store for `IoNode` properties and their configurations. */
 class Properties {
   /**
-   * Creates properties object for IoNode.
+   * Creates properties object for `IoNode`.
    * @param {IoNode} node - Reference to the node/element itself.
    * @param {ProtoProperties} protoProperties - List of property configurations defined in the protochain.
    */
@@ -472,14 +478,14 @@ class Properties {
  */
 class Property {
   /**
-  * Creates a property configuration object with following properties:
-  * @param {Object} config - Configuration object.
-  * @param {*} config.value - Default value.
-  * @param {function} config.type - Constructor of value.
-  * @param {boolean} config.reflect - Reflects to HTML attribute
-  * @param {Binding} config.binding - Binding object.
-  * @param {boolean} config.enumerable - Makes property enumerable.
-  */
+   * Creates a property configuration object with following properties:
+   * @param {Object} config - Configuration object.
+   * @param {*} config.value - Default value.
+   * @param {function} config.type - Constructor of value.
+   * @param {boolean} config.reflect - Reflects to HTML attribute
+   * @param {Binding} config.binding - Binding object.
+   * @param {boolean} config.enumerable - Makes property enumerable.
+   */
   constructor(config) {
     if (config === null || config === undefined) {
       config = {value: config};
@@ -532,16 +538,36 @@ class Property {
   }
 }
 
-// TODO: Improve tests and documentation.
+// TODO: Improve tests.
 
+/**
+  * Core mixin for `IoNode` and `IoElement` classes.
+  * @param {function} superclass - Class to extend.
+  * @return {IoNodeMixin} - Extended class with `IoNodeMixin` applied to it.
+  */
 const IoNodeMixin = (superclass) => {
   const classConstructor = class extends superclass {
+    /**
+     * Static properties getter. Node properties should be defined here.
+     * @return {Object} properties - Properties configuration objects.
+     * @return {Object|*} [properties.*] - Configuration object or one of the configuration parameters.
+     * @return {*} [properties.*.value] - Default value.
+     * @return {function} [properties.*.type] - Constructor of value.
+     * @return {boolean} [properties.*.reflect] - Reflects to HTML attribute
+     * @return {Binding} [properties.*.binding] - Binding object.
+     * @return {boolean} [properties.*.enumerable] - Makes property enumerable.
+     */
     static get properties() {
       return {};
     }
+    // TODO: refactor?
     get bindings() {
       return;
     }
+    /**
+      * Creates `IoNode` instance and initializes internals.
+      * @param {Object} initProps - Property values to inialize instance with.
+      */
     constructor(initProps = {}) {
       super(initProps);
 
@@ -564,28 +590,54 @@ const IoNodeMixin = (superclass) => {
 
       this.setProperties(initProps);
     }
-    connect(instance) {
-      this._instances = this._instances || [];
-      if (this._instances.indexOf(instance) === -1) {
-        this._instances.push(instance);
+    /**
+      * Connects IoNode to the application.
+      * @param {IoNode|IoElement} owner - Node or element `IoNode` is connected to.
+      */
+    connect(owner) {
+      this._owner = this._owner || [];
+      if (this._owner.indexOf(owner) === -1) {
+        this._owner.push(owner);
         if (!this.__connected) this.connectedCallback();
       }
     }
-    disconnect(instance) {
-      if (this._instances.indexOf(instance) !== -1) {
-        this._instances.splice(this._instances.indexOf(instance), 1);
+    /**
+      * Disconnects IoNode from the application.
+      * @param {IoNode|IoElement} owner - Node or element `IoNode` is connected to.
+      */
+    disconnect(owner) {
+      if (this._owner.indexOf(owner) !== -1) {
+        this._owner.splice(this._owner.indexOf(owner), 1);
       }
-      if (this._instances.length === 0 && this.__connected) {
+      if (this._owner.length === 0 && this.__connected) {
         this.disconnectedCallback();
       }
     }
+    /**
+      * Shorthand for `event.preventDefault()`.
+      * @param {Object} event - Event object.
+      */
     preventDefault(event) {
       event.preventDefault();
     }
+    /**
+      * default change handler.
+      */
     changed() {}
+    /**
+      * Returns a binding to a specified property`.
+      * @param {string} prop - Property to bind to.
+      * @return {Binding} Binding object.
+      */
     bind(prop) {
       return this.__nodeBindings.get(prop);
     }
+    /**
+      * Sets a property and emits [property]-set` event.
+      * Use this when property is set by user action (e.g. mouse click).
+      * @param {string} prop - Property name.
+      * @param {*} value - Property value.
+      */
     set(prop, value) {
       if (this[prop] !== value) {
         const oldValue = this[prop];
@@ -593,6 +645,12 @@ const IoNodeMixin = (superclass) => {
         this.dispatchEvent(prop + '-set', {property: prop, value: value, oldValue: oldValue}, false);
       }
     }
+    // TODO: consider renaming and simplifying `props` object structure.
+    /**
+      * Sets multiple properties in batch.
+      * [property]-changed` events will be broadcast in the end.
+      * @param {Object} props - Map of property names and values.
+      */
     setProperties(props) {
       for (let p in props) {
         if (this.__properties[p] === undefined) continue;
@@ -610,10 +668,10 @@ const IoNodeMixin = (superclass) => {
           this.style.setProperty(s, props['style'][s]);
         }
       }
-      // TODO: Consider postpoining dispatch for unconnected elements.
-      // if (this.__connected) this.queueDispatch();
-      this.queueDispatch();
+      if (this.__connected) this.queueDispatch();
     }
+    // TODO: Document.
+    // TODO: Refactor.
     // TODO: Test extensively.
     applyCompose(nodes) {
       for (let n in nodes) {
@@ -626,17 +684,28 @@ const IoNodeMixin = (superclass) => {
         });
       }
     }
+    /**
+      * This function is called when `object-mutated` event is observed
+      * and changed object is a property of the node.
+      * @param {Object} event - Property change event.
+      */
     onObjectMutation(event) {
       for (let i = this.__objectProps.length; i--;) {
         const prop = this.__objectProps[i];
         const value = this.__properties[prop].value;
         if (value === event.detail.object) {
-          if (this[prop + 'Mutated']) this[prop + 'Mutated'](event);
-          this.changed();
+          // TODO: consider optimizing
+          // setTimeout(()=> {
+            if (this[prop + 'Mutated']) this[prop + 'Mutated'](event);
+            this.changed();
+          // });
           return;
         }
       }
     }
+    /**
+      * Callback when `IoNode` is connected.
+      */
     connectedCallback() {
       this.__listeners.connect();
       this.__properties.connect();
@@ -646,6 +715,9 @@ const IoNodeMixin = (superclass) => {
       }
       this.queueDispatch();
     }
+    /**
+      * Callback when `IoNode` is disconnected.
+      */
     disconnectedCallback() {
       this.__listeners.disconnect();
       this.__properties.disconnect();
@@ -654,24 +726,54 @@ const IoNodeMixin = (superclass) => {
         window.removeEventListener('object-mutated', this.onObjectMutation);
       }
     }
+    /**
+      * Disposes all internals.
+      * Use this when node is no longer needed.
+      */
     dispose() {
       this.__nodeQueue.dispose();
       this.__nodeBindings.dispose();
       this.__listeners.dispose();
       this.__properties.dispose();
     }
+    /**
+      * Wrapper for addEventListener.
+      * @param {string} type - listener name.
+      * @param {function} listener - listener handler.
+      */
     addEventListener(type, listener) {
       this.__listeners.addEventListener(type, listener);
     }
+    /**
+      * Wrapper for removeEventListener.
+      * @param {string} type - event name to listen to.
+      * @param {function} listener - listener handler.
+      */
     removeEventListener(type, listener) {
       this.__listeners.removeEventListener(type, listener);
     }
+    /**
+      * Wrapper for dispatchEvent.
+      * @param {string} type - event name to dispatch.
+      * @param {Object} detail - event detail.
+      * @param {boolean} bubbles - event bubbles.
+      * @param {HTMLElement|IoNode} src source node/element to dispatch event from.
+      */
     dispatchEvent(type, detail, bubbles = false, src) {
       this.__listeners.dispatchEvent(type, detail, bubbles, src);
     }
+    /**
+      * Adds property change to the queue.
+      * @param {string} prop - Property name.
+      * @param {*} value - Property value.
+      * @param {*} oldValue - Old property value.
+      */
     queue(prop, value, oldValue) {
       this.__nodeQueue.queue(prop, value, oldValue);
     }
+    /**
+      * Dispatches the queue.
+      */
     queueDispatch() {
       this.__nodeQueue.dispatch();
     }
@@ -680,6 +782,11 @@ const IoNodeMixin = (superclass) => {
   return classConstructor;
 };
 
+/**
+  * Register function to be called once per class.
+  * `IoNode` will self-register on first instance constructor.
+  * `IoElement` classes should call Register manually before first instance is created.
+  */
 const Register = function () {
   Object.defineProperty(this.prototype, '__registered', {value: true});
 
@@ -716,7 +823,9 @@ const Register = function () {
   const ignore = [Boolean, String, Number, HTMLElement, Function, undefined];
   for (let prop in this.prototype.__protoProperties) {
     let type = this.prototype.__protoProperties[prop].type;
-    if (ignore.indexOf(type) == -1) this.prototype.__objectProps.push(prop);
+    if (prop !== '$') { // TODO: unhack
+      if (ignore.indexOf(type) == -1) this.prototype.__objectProps.push(prop);
+    }
   }
 
   for (let prop in this.prototype.__protoProperties) {
@@ -731,9 +840,11 @@ const Register = function () {
         const oldValue = this.__properties.get(prop);
         this.__properties.set(prop, value);
         value = this.__properties.get(prop);
-        if (isPublic && this.__connected) {
+        if (isPublic) {
           this.queue(prop, value, oldValue);
-          this.queueDispatch();
+          if (this.__connected) {
+            this.queueDispatch();
+          }
         }
       },
       enumerable: isEnumerable && isPublic,
@@ -744,11 +855,21 @@ const Register = function () {
 
 IoNodeMixin.Register = Register;
 
+/**
+  * IoNodeMixin applied to `Object` class.
+  */
 class IoNode extends IoNodeMixin(Object) {}
 
-// TODO: Improve tests and documentation.
-
+// TODO: Improve tests.
+/**
+  * Base class for custom elements.
+  * `IoNodeMixin` applied to `HTMLElement` and a few custom functions.
+  */
 class IoElement extends IoNodeMixin(HTMLElement) {
+  /**
+   * See IoNode for more details.
+   * @return {Object} properties - Properties configuration objects.
+   */
   static get properties() {
     return {
       id: {
@@ -780,6 +901,10 @@ class IoElement extends IoNodeMixin(HTMLElement) {
       },
     };
   }
+  /**
+    * Callback when `IoElement` is connected.
+    * Resize listener is added here if element class has `resized()` function defined.
+    */
   connectedCallback() {
     super.connectedCallback();
     for (let prop in this.__properties) {
@@ -796,6 +921,9 @@ class IoElement extends IoNodeMixin(HTMLElement) {
       }
     }
   }
+  /**
+    * Callback when `IoElement` is connected.
+    */
   disconnectedCallback() {
     super.disconnectedCallback();
     if (typeof this.resized == 'function') {
@@ -806,16 +934,30 @@ class IoElement extends IoNodeMixin(HTMLElement) {
       }
     }
   }
+  /**
+    * Disposes all internals.
+    * Use this when node is no longer needed.
+    */
   dispose() {
     super.dispose();
     delete this.parent;
     this.children.lenght = 0;
     // this.__properties.$.value = {};
   }
+  /**
+    * Renders DOM from virtual DOM arrays.
+    * @param {Array} children - Array of vDOM children.
+    * @param {HTMLElement} [host] - Optional template target.
+    */
   template(children, host) {
     // this.__properties.$.value = {};
     this.traverse(buildTree()(['root', children]).children, host || this);
   }
+  /**
+    * Recurively traverses vDOM.
+    * @param {Array} vChildren - Array of vDOM children converted by `buildTree()` for easier parsing.
+    * @param {HTMLElement} [host] - Optional template target.
+    */
   traverse(vChildren, host) {
     const children = host.children;
     // remove trailing elements
@@ -890,7 +1032,7 @@ class IoElement extends IoNodeMixin(HTMLElement) {
       }
     }
   }
-  // fixup for setAttribute
+  // fixup for HTMLElement setAttribute
   setAttribute(attr, value) {
     if (value === true) {
       HTMLElement.prototype.setAttribute.call(this, attr, '');
@@ -910,6 +1052,9 @@ Please try <a href="https://www.mozilla.org/en-US/firefox/new/">Firefox</a>,
 <a href="https://www.google.com/chrome/">Chrome</a> or
 <a href="https://www.apple.com/lae/safari/">Safari</a>`;
 
+/**
+  * Register function for `IoElement`. Registers custom element.
+  */
 IoElement.Register = function() {
 
   IoNodeMixin.Register.call(this);
@@ -938,6 +1083,12 @@ if (window.ResizeObserver !== undefined) {
   });
 }
 
+// TODO: refactor and make more powerful.
+/**
+  * Template literal handler for HTML strings.
+  * @param {Array} parts - Template literal array argument.
+  * @return {string} - Created HTML code.
+  */
 function html(parts) {
   let result = {
     string: '',
@@ -958,6 +1109,11 @@ function html(parts) {
   return result;
 }
 
+/**
+  * Creates an element from virtual dom array.
+  * @param {Array} vDOMNode - Virtual dom array.
+  * @return {HTMLElement} - Created element.
+  */
 const constructElement = function(vDOMNode) {
  let ConstructorClass = window.customElements ? window.customElements.get(vDOMNode.name) : null;
  if (ConstructorClass) return new ConstructorClass(vDOMNode.props);
@@ -988,6 +1144,10 @@ const buildTree = () => node => !!node && typeof node[1] === 'object' && !Array.
 
 const _stagingElement = document.createElement('div');
 
+/**
+  * Initializes the element style.
+  * @param {Array} prototypes - An array of prototypes to ge the styles from.
+  */
 function initStyle(prototypes) {
   let localName = prototypes[0].constructor.name.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
   for (let i = prototypes.length; i--;) {
@@ -1148,4 +1308,4 @@ function IoStorage(key, defValue, hash) {
  * @author arodic / https://github.com/arodic
  */
 
-export { IoNodeMixin, IoNode, IoElement, html, initStyle, Binding, NodeBindings, IoServiceLoader, IoStorage, nodes as storageNodes };
+export { IoNodeMixin, IoNode, IoElement, html, Binding, NodeBindings, IoServiceLoader, IoStorage, nodes as storageNodes };

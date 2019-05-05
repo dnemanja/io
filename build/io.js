@@ -1,10 +1,10 @@
 // TODO: Improve tests.
 
-/** Manager for IoNode bindings. */
+/** Manager for `IoNode` and `IoElement` bindings. */
 class NodeBindings {
   /**
-   * Creates binding manager for IoNode.
-   * @param {IoNode} node - Reference to the node/element itself.
+   * Creates binding manager for `IoNode`.
+   * @param {IoNode|IoElement} node - Reference to the node/element itself.
    */
   constructor(node) {
     Object.defineProperty(this, 'node', {value: node, configurable: true});
@@ -152,12 +152,12 @@ class Binding {
   }
 }
 
-// TODO: TEST
+// TODO: Improve tests.
 
-/** Manager for IoNode event queue and change handle functions. */
+/** Manager for `IoNode` event queue and change handle functions. */
 class NodeQueue extends Array {
   /**
-   * Creates queue manager for IoNode.
+   * Creates queue manager for `IoNode`.
    * @param {IoNode} node - Reference to the node/element itself.
    */
   constructor(node) {
@@ -223,10 +223,10 @@ class ProtoListeners {
   }
 }
 
-/** Manager for IoNode listeners. */
+/** Manager for `IoNode` listeners. */
 class Listeners {
   /**
-   * Creates listener manager for IoNode.
+   * Creates listener manager for `IoNode`.
    * @param {IoNode} node - Reference to the node/element itself.
    * @param {ProtoListeners} protoListeners - List of listeners defined in the protochain.
    */
@@ -250,7 +250,7 @@ class Listeners {
     }
   }
   /**
-   * Adds all event listeners.
+   * Adds event listeners.
    */
   connect() {
     const node = this.node;
@@ -265,7 +265,7 @@ class Listeners {
     }
   }
   /**
-   * Removes all event listeners.
+   * Removes event listeners.
    */
   disconnect() {
     const node = this.node;
@@ -348,7 +348,7 @@ class Listeners {
   }
 }
 
-// TODO: Improve tests and documentation.
+// TODO: Improve tests.
 
 /** Creates a map of all property configurations defined in the prototype chain. */
 class ProtoProperties {
@@ -368,12 +368,18 @@ class ProtoProperties {
       this[key] = new Property(propertyDefs[key]);
     }
   }
+  get(prop) {
+    console.warn('Property', prop, 'cannot be get before instance is constructed.');
+  }
+  set(prop) {
+    console.warn('Property', prop, 'cannot be set before instance is constructed.');
+  }
 }
 
-/** Store for IoNode properties and their configurations. */
+/** Store for `IoNode` properties and their configurations. */
 class Properties {
   /**
-   * Creates properties object for IoNode.
+   * Creates properties object for `IoNode`.
    * @param {IoNode} node - Reference to the node/element itself.
    * @param {ProtoProperties} protoProperties - List of property configurations defined in the protochain.
    */
@@ -472,14 +478,14 @@ class Properties {
  */
 class Property {
   /**
-  * Creates a property configuration object with following properties:
-  * @param {Object} config - Configuration object.
-  * @param {*} config.value - Default value.
-  * @param {function} config.type - Constructor of value.
-  * @param {boolean} config.reflect - Reflects to HTML attribute
-  * @param {Binding} config.binding - Binding object.
-  * @param {boolean} config.enumerable - Makes property enumerable.
-  */
+   * Creates a property configuration object with following properties:
+   * @param {Object} config - Configuration object.
+   * @param {*} config.value - Default value.
+   * @param {function} config.type - Constructor of value.
+   * @param {boolean} config.reflect - Reflects to HTML attribute
+   * @param {Binding} config.binding - Binding object.
+   * @param {boolean} config.enumerable - Makes property enumerable.
+   */
   constructor(config) {
     if (config === null || config === undefined) {
       config = {value: config};
@@ -532,16 +538,36 @@ class Property {
   }
 }
 
-// TODO: Improve tests and documentation.
+// TODO: Improve tests.
 
+/**
+  * Core mixin for `IoNode` and `IoElement` classes.
+  * @param {function} superclass - Class to extend.
+  * @return {IoNodeMixin} - Extended class with `IoNodeMixin` applied to it.
+  */
 const IoNodeMixin = (superclass) => {
   const classConstructor = class extends superclass {
+    /**
+     * Static properties getter. Node properties should be defined here.
+     * @return {Object} properties - Properties configuration objects.
+     * @return {Object|*} [properties.*] - Configuration object or one of the configuration parameters.
+     * @return {*} [properties.*.value] - Default value.
+     * @return {function} [properties.*.type] - Constructor of value.
+     * @return {boolean} [properties.*.reflect] - Reflects to HTML attribute
+     * @return {Binding} [properties.*.binding] - Binding object.
+     * @return {boolean} [properties.*.enumerable] - Makes property enumerable.
+     */
     static get properties() {
       return {};
     }
+    // TODO: refactor?
     get bindings() {
       return;
     }
+    /**
+      * Creates `IoNode` instance and initializes internals.
+      * @param {Object} initProps - Property values to inialize instance with.
+      */
     constructor(initProps = {}) {
       super(initProps);
 
@@ -564,28 +590,54 @@ const IoNodeMixin = (superclass) => {
 
       this.setProperties(initProps);
     }
-    connect(instance) {
-      this._instances = this._instances || [];
-      if (this._instances.indexOf(instance) === -1) {
-        this._instances.push(instance);
+    /**
+      * Connects IoNode to the application.
+      * @param {IoNode|IoElement} owner - Node or element `IoNode` is connected to.
+      */
+    connect(owner) {
+      this._owner = this._owner || [];
+      if (this._owner.indexOf(owner) === -1) {
+        this._owner.push(owner);
         if (!this.__connected) this.connectedCallback();
       }
     }
-    disconnect(instance) {
-      if (this._instances.indexOf(instance) !== -1) {
-        this._instances.splice(this._instances.indexOf(instance), 1);
+    /**
+      * Disconnects IoNode from the application.
+      * @param {IoNode|IoElement} owner - Node or element `IoNode` is connected to.
+      */
+    disconnect(owner) {
+      if (this._owner.indexOf(owner) !== -1) {
+        this._owner.splice(this._owner.indexOf(owner), 1);
       }
-      if (this._instances.length === 0 && this.__connected) {
+      if (this._owner.length === 0 && this.__connected) {
         this.disconnectedCallback();
       }
     }
+    /**
+      * Shorthand for `event.preventDefault()`.
+      * @param {Object} event - Event object.
+      */
     preventDefault(event) {
       event.preventDefault();
     }
+    /**
+      * default change handler.
+      */
     changed() {}
+    /**
+      * Returns a binding to a specified property`.
+      * @param {string} prop - Property to bind to.
+      * @return {Binding} Binding object.
+      */
     bind(prop) {
       return this.__nodeBindings.get(prop);
     }
+    /**
+      * Sets a property and emits [property]-set` event.
+      * Use this when property is set by user action (e.g. mouse click).
+      * @param {string} prop - Property name.
+      * @param {*} value - Property value.
+      */
     set(prop, value) {
       if (this[prop] !== value) {
         const oldValue = this[prop];
@@ -593,6 +645,12 @@ const IoNodeMixin = (superclass) => {
         this.dispatchEvent(prop + '-set', {property: prop, value: value, oldValue: oldValue}, false);
       }
     }
+    // TODO: consider renaming and simplifying `props` object structure.
+    /**
+      * Sets multiple properties in batch.
+      * [property]-changed` events will be broadcast in the end.
+      * @param {Object} props - Map of property names and values.
+      */
     setProperties(props) {
       for (let p in props) {
         if (this.__properties[p] === undefined) continue;
@@ -610,10 +668,10 @@ const IoNodeMixin = (superclass) => {
           this.style.setProperty(s, props['style'][s]);
         }
       }
-      // TODO: Consider postpoining dispatch for unconnected elements.
-      // if (this.__connected) this.queueDispatch();
-      this.queueDispatch();
+      if (this.__connected) this.queueDispatch();
     }
+    // TODO: Document.
+    // TODO: Refactor.
     // TODO: Test extensively.
     applyCompose(nodes) {
       for (let n in nodes) {
@@ -626,17 +684,28 @@ const IoNodeMixin = (superclass) => {
         });
       }
     }
+    /**
+      * This function is called when `object-mutated` event is observed
+      * and changed object is a property of the node.
+      * @param {Object} event - Property change event.
+      */
     onObjectMutation(event) {
       for (let i = this.__objectProps.length; i--;) {
         const prop = this.__objectProps[i];
         const value = this.__properties[prop].value;
         if (value === event.detail.object) {
-          if (this[prop + 'Mutated']) this[prop + 'Mutated'](event);
-          this.changed();
+          // TODO: consider optimizing
+          // setTimeout(()=> {
+            if (this[prop + 'Mutated']) this[prop + 'Mutated'](event);
+            this.changed();
+          // });
           return;
         }
       }
     }
+    /**
+      * Callback when `IoNode` is connected.
+      */
     connectedCallback() {
       this.__listeners.connect();
       this.__properties.connect();
@@ -646,6 +715,9 @@ const IoNodeMixin = (superclass) => {
       }
       this.queueDispatch();
     }
+    /**
+      * Callback when `IoNode` is disconnected.
+      */
     disconnectedCallback() {
       this.__listeners.disconnect();
       this.__properties.disconnect();
@@ -654,24 +726,54 @@ const IoNodeMixin = (superclass) => {
         window.removeEventListener('object-mutated', this.onObjectMutation);
       }
     }
+    /**
+      * Disposes all internals.
+      * Use this when node is no longer needed.
+      */
     dispose() {
       this.__nodeQueue.dispose();
       this.__nodeBindings.dispose();
       this.__listeners.dispose();
       this.__properties.dispose();
     }
+    /**
+      * Wrapper for addEventListener.
+      * @param {string} type - listener name.
+      * @param {function} listener - listener handler.
+      */
     addEventListener(type, listener) {
       this.__listeners.addEventListener(type, listener);
     }
+    /**
+      * Wrapper for removeEventListener.
+      * @param {string} type - event name to listen to.
+      * @param {function} listener - listener handler.
+      */
     removeEventListener(type, listener) {
       this.__listeners.removeEventListener(type, listener);
     }
+    /**
+      * Wrapper for dispatchEvent.
+      * @param {string} type - event name to dispatch.
+      * @param {Object} detail - event detail.
+      * @param {boolean} bubbles - event bubbles.
+      * @param {HTMLElement|IoNode} src source node/element to dispatch event from.
+      */
     dispatchEvent(type, detail, bubbles = false, src) {
       this.__listeners.dispatchEvent(type, detail, bubbles, src);
     }
+    /**
+      * Adds property change to the queue.
+      * @param {string} prop - Property name.
+      * @param {*} value - Property value.
+      * @param {*} oldValue - Old property value.
+      */
     queue(prop, value, oldValue) {
       this.__nodeQueue.queue(prop, value, oldValue);
     }
+    /**
+      * Dispatches the queue.
+      */
     queueDispatch() {
       this.__nodeQueue.dispatch();
     }
@@ -680,6 +782,11 @@ const IoNodeMixin = (superclass) => {
   return classConstructor;
 };
 
+/**
+  * Register function to be called once per class.
+  * `IoNode` will self-register on first instance constructor.
+  * `IoElement` classes should call Register manually before first instance is created.
+  */
 const Register = function () {
   Object.defineProperty(this.prototype, '__registered', {value: true});
 
@@ -716,7 +823,9 @@ const Register = function () {
   const ignore = [Boolean, String, Number, HTMLElement, Function, undefined];
   for (let prop in this.prototype.__protoProperties) {
     let type = this.prototype.__protoProperties[prop].type;
-    if (ignore.indexOf(type) == -1) this.prototype.__objectProps.push(prop);
+    if (prop !== '$') { // TODO: unhack
+      if (ignore.indexOf(type) == -1) this.prototype.__objectProps.push(prop);
+    }
   }
 
   for (let prop in this.prototype.__protoProperties) {
@@ -731,9 +840,11 @@ const Register = function () {
         const oldValue = this.__properties.get(prop);
         this.__properties.set(prop, value);
         value = this.__properties.get(prop);
-        if (isPublic && this.__connected) {
+        if (isPublic) {
           this.queue(prop, value, oldValue);
-          this.queueDispatch();
+          if (this.__connected) {
+            this.queueDispatch();
+          }
         }
       },
       enumerable: isEnumerable && isPublic,
@@ -744,11 +855,21 @@ const Register = function () {
 
 IoNodeMixin.Register = Register;
 
+/**
+  * IoNodeMixin applied to `Object` class.
+  */
 class IoNode extends IoNodeMixin(Object) {}
 
-// TODO: Improve tests and documentation.
-
+// TODO: Improve tests.
+/**
+  * Base class for custom elements.
+  * `IoNodeMixin` applied to `HTMLElement` and a few custom functions.
+  */
 class IoElement extends IoNodeMixin(HTMLElement) {
+  /**
+   * See IoNode for more details.
+   * @return {Object} properties - Properties configuration objects.
+   */
   static get properties() {
     return {
       id: {
@@ -780,6 +901,10 @@ class IoElement extends IoNodeMixin(HTMLElement) {
       },
     };
   }
+  /**
+    * Callback when `IoElement` is connected.
+    * Resize listener is added here if element class has `resized()` function defined.
+    */
   connectedCallback() {
     super.connectedCallback();
     for (let prop in this.__properties) {
@@ -796,6 +921,9 @@ class IoElement extends IoNodeMixin(HTMLElement) {
       }
     }
   }
+  /**
+    * Callback when `IoElement` is connected.
+    */
   disconnectedCallback() {
     super.disconnectedCallback();
     if (typeof this.resized == 'function') {
@@ -806,16 +934,30 @@ class IoElement extends IoNodeMixin(HTMLElement) {
       }
     }
   }
+  /**
+    * Disposes all internals.
+    * Use this when node is no longer needed.
+    */
   dispose() {
     super.dispose();
     delete this.parent;
     this.children.lenght = 0;
     // this.__properties.$.value = {};
   }
+  /**
+    * Renders DOM from virtual DOM arrays.
+    * @param {Array} children - Array of vDOM children.
+    * @param {HTMLElement} [host] - Optional template target.
+    */
   template(children, host) {
     // this.__properties.$.value = {};
     this.traverse(buildTree()(['root', children]).children, host || this);
   }
+  /**
+    * Recurively traverses vDOM.
+    * @param {Array} vChildren - Array of vDOM children converted by `buildTree()` for easier parsing.
+    * @param {HTMLElement} [host] - Optional template target.
+    */
   traverse(vChildren, host) {
     const children = host.children;
     // remove trailing elements
@@ -890,7 +1032,7 @@ class IoElement extends IoNodeMixin(HTMLElement) {
       }
     }
   }
-  // fixup for setAttribute
+  // fixup for HTMLElement setAttribute
   setAttribute(attr, value) {
     if (value === true) {
       HTMLElement.prototype.setAttribute.call(this, attr, '');
@@ -910,6 +1052,9 @@ Please try <a href="https://www.mozilla.org/en-US/firefox/new/">Firefox</a>,
 <a href="https://www.google.com/chrome/">Chrome</a> or
 <a href="https://www.apple.com/lae/safari/">Safari</a>`;
 
+/**
+  * Register function for `IoElement`. Registers custom element.
+  */
 IoElement.Register = function() {
 
   IoNodeMixin.Register.call(this);
@@ -938,6 +1083,12 @@ if (window.ResizeObserver !== undefined) {
   });
 }
 
+// TODO: refactor and make more powerful.
+/**
+  * Template literal handler for HTML strings.
+  * @param {Array} parts - Template literal array argument.
+  * @return {string} - Created HTML code.
+  */
 function html(parts) {
   let result = {
     string: '',
@@ -958,6 +1109,11 @@ function html(parts) {
   return result;
 }
 
+/**
+  * Creates an element from virtual dom array.
+  * @param {Array} vDOMNode - Virtual dom array.
+  * @return {HTMLElement} - Created element.
+  */
 const constructElement = function(vDOMNode) {
  let ConstructorClass = window.customElements ? window.customElements.get(vDOMNode.name) : null;
  if (ConstructorClass) return new ConstructorClass(vDOMNode.props);
@@ -988,6 +1144,10 @@ const buildTree = () => node => !!node && typeof node[1] === 'object' && !Array.
 
 const _stagingElement = document.createElement('div');
 
+/**
+  * Initializes the element style.
+  * @param {Array} prototypes - An array of prototypes to ge the styles from.
+  */
 function initStyle(prototypes) {
   let localName = prototypes[0].constructor.name.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
   for (let i = prototypes.length; i--;) {
@@ -1355,7 +1515,7 @@ IoButton.Register();
 
 class IoBoolean extends IoButton {
   static get style() {
-    return html`<style>:host {display: inline;background: none;}</style>`;
+    return html`<style>:host {display: inline-block;background: none;}</style>`;
   }
   static get properties() {
     return {
@@ -1384,7 +1544,8 @@ IoBoolean.Register();
 // TODO: document, demo, test
 
 const canvas = document.createElement('canvas');
-const gl = canvas.getContext('webgl', {antialias: true, premultipliedAlpha: false});
+const gl = canvas.getContext('webgl', {antialias: false, premultipliedAlpha: false});
+gl.imageSmoothingEnabled = false;
 
 gl.enable(gl.BLEND);
 gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -1424,7 +1585,7 @@ const shadersCache = new WeakMap();
 
 class IoCanvas extends IoElement {
   static get style() {
-    return html`<style>:host {box-sizing: border-box;overflow: hidden;position: relative;border: 1px solid black;}:host > canvas {position: absolute;top: 0px;left: 0px;touch-action: none;user-select: none;}</style>`;
+    return html`<style>:host {box-sizing: border-box;overflow: hidden;position: relative;border: 1px solid black;}:host > canvas {position: absolute;top: 0px;left: 0px;touch-action: none;user-select: none;image-rendering: pixelated;}</style>`;
   }
   static get properties() {
     return {
@@ -1446,7 +1607,7 @@ class IoCanvas extends IoElement {
   constructor(props) {
     super(props);
 
-    let frag = 'precision mediump float;';
+    let frag = 'precision mediump float;\n';
 
     for (let prop in this.__properties) {
       let type = this.__properties[prop].type;
@@ -1486,6 +1647,7 @@ class IoCanvas extends IoElement {
 
     this.template([['canvas', {id: 'canvas'}]]);
     this._context2d = this.$.canvas.getContext('2d');
+    this._context2d.imageSmoothingEnabled = false;
 
     this.render();
   }
@@ -1493,10 +1655,12 @@ class IoCanvas extends IoElement {
     const rect = this.getBoundingClientRect();
     this.size[0] = rect.width;
     this.size[1] = rect.height;
-    this.render();
+    this.changed();
   }
   changed() {
-    this.render();
+    requestAnimationFrame(() => {
+      this.render();
+    });
   }
   render() {
     if (!this._shader) return;
@@ -1571,8 +1735,7 @@ class IoCollapsable extends IoElement {
 IoCollapsable.Register();
 
 // TODO: document and test
-
-const stagingElement = document.createElement('div');
+// TODO: consider renaming
 
 class IoElementCache extends IoElement {
   static get properties() {
@@ -1583,6 +1746,11 @@ class IoElementCache extends IoElement {
       cache: Boolean,
       _cache: Object,
     };
+  }
+  constructor(props) {
+    super(props);
+    this.stagingElement = document.createElement('io-element-cache-staging');
+    document.head.appendChild(this.stagingElement);
   }
   connectedCallback() {
     super.connectedCallback();
@@ -1597,17 +1765,18 @@ class IoElementCache extends IoElement {
   }
   precacheChanged() {
     if (this.precache && document.readyState === 'complete') {
-      this.template(this.elements, stagingElement);
-      for (let i = 0; i < stagingElement.childNodes.length; i++) {
-        this._cache[i] = stagingElement.childNodes[i];
+      // console.log(this.elements)
+      this.template(this.elements, this.stagingElement);
+      for (let i = 0; i < this.stagingElement.childNodes.length; i++) {
+        this._cache[i] = this.stagingElement.childNodes[i];
       }
-      stagingElement.innerHTML = '';
     }
+    this.stagingElement.innerHTML = '';
   }
   dispose() {
     super.dispose();
     this.innerHTML = '';
-    stagingElement.innerHTML = '';
+    this.stagingElement.innerHTML = '';
     delete this._cache;
   }
   changed() {
@@ -1618,10 +1787,10 @@ class IoElementCache extends IoElement {
     } else {
       if (this.cache) {
         this.innerHTML = '';
-        this.template([this.elements[this.selected]], stagingElement);
-        this._cache[this.selected] = stagingElement.childNodes[0];
+        this.template([this.elements[this.selected]], this.stagingElement);
+        this._cache[this.selected] = this.stagingElement.childNodes[0];
         this.appendChild(this._cache[this.selected]);
-        stagingElement.innerHTML = '';
+        this.stagingElement.innerHTML = '';
       } else {
         this.template([this.elements[this.selected]]);
       }
@@ -1839,6 +2008,312 @@ IoInspector.RegisterConfig = function(config) {
   this.prototype.__config.registerConfig(config);
 };
 
+class IoLayoutDivider extends IoElement {
+  static get style() {
+    return html`<style>:host {background: #333;color: #ccc;z-index: 1;display: flex;flex: none;border: 1px outset #666;}:host[orientation=horizontal] {cursor: col-resize;width: 4px;}:host[orientation=vertical] {cursor: row-resize;height: 4px;}:host > .app-divider {flex: 1;margin: -0.4em;display: flex;align-items: center;justify-content: center;}</style>`;
+  }
+  static get properties() {
+    return {
+      orientation: {
+        value: 'horizontal',
+        reflect: true
+      },
+      index: Number,
+      pointermode: 'relative'
+    };
+  }
+  static get listeners() {
+    return {
+      'pointer-move': '_onPointerMove'
+    };
+  }
+  _onPointerMove(event) {
+    console.log(event);
+    // let rect = this.getBoundingClientRect();
+    // let pos = event.detail.pointer[0].position;
+    // let mov = this.orientation === 'horizontal' ? pos.x : pos.y;
+    // let dim = this.orientation === 'horizontal' ? 'width' : 'height';
+    // this.dispatchEvent('layout-divider-move', {movement: mov - rect[dim] / 2, index: this.index});
+  }
+  changed() {
+    this.template([
+      ['div', {className: 'app-divider'}, this.orientation === 'horizontal' ? '⋮' : '⋯']
+    ]);
+  }
+}
+
+IoLayoutDivider.Register();
+
+const _dragIcon = document.createElement('div');
+_dragIcon.style = `pointer-events: none; position: fixed; padding: 0.2em 1.6em; background: rgba(0,0,0,0.5); z-index:2147483647`;
+
+class IoLayoutTab extends IoElement {
+  static get properties() {
+    return {
+      element: Object,
+      tabID: String,
+      selected: {
+        type: Boolean,
+        reflect: true
+      },
+      pointermode: 'absolute'
+    };
+  }
+  static get listeners() {
+    return {
+      'io-pointer-end': '_onPointerEnd',
+      'io-pointer-move': '_onPointerMove'
+    };
+  }
+  changed() {
+    this.innerText = this.tabID;
+  }
+  _onPointerMove(event) {
+    let pointer = event.detail.pointer[0];
+    let dist = pointer.distance.length();
+    if (!this._dragging && dist > 16 && event.detail.path[0] === this) {
+      this._dragging = true;
+      this.appendChild(_dragIcon);
+      this.dispatchEvent('layout-tab-drag-start', {pointer: pointer, tab: this});
+    }
+    _dragIcon.innerText = this.tabID;
+    _dragIcon.style.left = pointer.position.x - 12 + 'px';
+    _dragIcon.style.top = pointer.position.y - 12 + 'px';
+    if (this._dragging) {
+      this.dispatchEvent('layout-tab-drag', {pointer: pointer, tab: this});
+    }
+  }
+  _onPointerEnd() {
+    if (this._dragging) {
+      this.removeChild(_dragIcon);
+      this._dragging = false;
+      this.dispatchEvent('layout-tab-drag-end', {tab: this});
+    } else {
+      this.dispatchEvent('layout-tab-select', {tabID: this.tabID});
+    }
+  }
+}
+
+IoLayoutTab.Register();
+
+class IoLayoutTabs extends IoElement {
+  static get style() {
+    return html`<style>:host {flex: none;display: flex;flex-direction: row;background: #bbb;line-height: 1em;overflow: hidden;}:host > io-selector {flex-grow: 1;/* flex-shrink: 1; *//* cursor: pointer; *//* padding: 0.2em 1.6em; *//* border-right: 1px solid #999; *//* overflow: hidden; *//* text-overflow: ellipsis; *//* white-space: nowrap; */}/* :host > io-layout-tab {flex-grow: 0;flex-shrink: 1;cursor: pointer;padding: 0.2em 1.6em;border-right: 1px solid #999;overflow: hidden;text-overflow: ellipsis;white-space: nowrap;}:host > io-layout-tab[selected] {background: #ccc;}:host > io-button {line-height: 1em;display: inline-block;padding: 0.05em 0.4em;margin-left: -1.5em;}:host > io-option {display: inline-block;padding: 0.2em 0.6em;}:host > io-option,:host > io-button {opacity: 0.2;}:host > io-option:hover,:host > io-button:hover {opacity: 1;} */</style>`;
+  }
+  static get properties() {
+    return {
+      elements: Object,
+      tabs: Array,
+      selected: Number
+    };
+  }
+  changed() {
+    // let tabs = [];
+    // for (let i = 0; i < this.tabs.length; i++) {
+    //   tabs.push(['io-layout-tab', {
+    //     element: this.elements[this.selected],
+    //     tabID: this.tabs[i],
+    //     selected: this.selected === i}]);
+    //   tabs.push(['io-button', {
+    //     label: '⨯',
+    //     action: this._onRemove,
+    //     value: i}]);
+    // }
+    // tabs.push(
+    //   ['io-option', {
+    //     value: '+',
+    //     // TODO: optimize - this runs on resize etc.
+    //     options: Object.entries(this.elements).map((entry) => ({value: entry[0]})),
+    //     action: this._onAddTab
+    //   }]
+    // );
+    // this.template([tabs]);
+
+    let tabs = [];
+    for (let i = 0; i < this.tabs.length; i++) {
+      tabs.push(this.elements[this.tabs[i]]);
+    }
+    this.template([
+      ['io-selector', {
+        elements: tabs,
+        selected: this.selected || 0,
+      }]
+    ]);
+  }
+  // _onRemove(index) {
+  //   this.dispatchEvent('layout-tabs-remove', {tabID: this.tabs[index]});
+  // }
+  // _onAddTab(tabID) {
+  //   this.dispatchEvent('layout-tabs-add', {tabID: tabID, index: this.tabs.length});
+  // }
+}
+
+IoLayoutTabs.Register();
+
+class IoLayoutSplits extends IoElement {
+  static get style() {
+    return html`<style>:host{flex: 1;display: flex;overflow: hidden;}:host[orientation=horizontal] {flex-direction: row;}:host[orientation=vertical] {flex-direction: column;}</style>`;
+  }
+  static get properties() {
+    return {
+      elements: Object,
+      splits: Object,
+      orientation: {
+        value: 'horizontal',
+        reflect: true
+      }
+    };
+  }
+  // static get listeners() {
+  //   return {
+  //     'layout-divider-move': '_onDividerMove',
+  //     'layout-changed': '_onAppBlockChanged'
+  //   };
+  // }
+  // _onAppBlockChanged(event) {
+  //   for (let i = this.splits.length; i--;) {
+  //     if (this.splits[i][1].tabs == event.detail.tabs) {
+  //       this.splits[i][1].selected = event.detail.selected;
+  //       // if (event.detail.tabs.length === 0) {
+  //       //   this.splits.splice(i, 1);
+  //       //   console.log(event.detail.tabs);
+  //       // }
+  //     }
+  //   }
+  //   this.changed();
+  // }
+  // addSplit(elementID, srcBlock, target) {
+  //   let hor = this.orientation === 'horizontal';
+  //   let ver = this.orientation === 'vertical';
+  //
+  //   let $blocks = [].slice.call(this.children).filter(element => element.localName !== 'io-layout-divider');
+  //   let spliceIndex = $blocks.indexOf(srcBlock);
+  //   let divideIndex = -1;
+  //
+  //   if ((hor && target == 'right') || (ver && target == 'bottom')) spliceIndex += 1;
+  //   else if ((hor && target == 'top') || (ver && target == 'left')) divideIndex = 0;
+  //   else if ((hor && target == 'bottom') || (ver && target == 'right')) divideIndex = 1;
+  //
+  //   let newBlock = ['io-layout', {'tabs': [elementID], 'selected': 0}];
+  //   if (divideIndex !== -1) {
+  //     let split = this.splits[spliceIndex];
+  //     this.splits.splice(spliceIndex, 1, ['io-layout', {'orientation': hor ? 'vertical' : 'horizontal', 'splits': [
+  //       divideIndex ? split : newBlock,
+  //       divideIndex ? newBlock : split
+  //     ]}]);
+  //   } else {
+  //     this.splits.splice(spliceIndex, 0, newBlock);
+  //   }
+  //   this.changed();
+  // }
+  changed() {
+    // let dim = this.orientation === 'horizontal' ? 'width' : 'height';
+    // let SPLIT_SIZE = 5;
+    // let rectSize = this.getBoundingClientRect()[dim];
+    // let maxFlex = rectSize - (this.splits.length - 1) * SPLIT_SIZE;
+
+    let children = [];
+    for (let i = 0; i < this.splits.length; i++) {
+      const split = this.splits[i];
+      const flexBasis = split.size !== undefined ? split.size + 'px' : null;
+      const style = {
+        'flex-basis': flexBasis ? flexBasis : 'auto',
+        'flex-grow': flexBasis ? 0 : 1,
+        'flex-shrink': 1 // flexBasis ? 1 : 0
+      };
+      if (split.tabs) {
+        children.push(['io-layout-tabs', {
+          elements: this.elements,
+          tabs: split.tabs,
+          selected: split.selected,
+          style: style,
+        }]);
+      } else if (split.splits) {
+        children.push(['io-layout-splits', {
+          elements: this.elements,
+          splits: split.splits,
+          orientation: split.orientation,
+          style: style,
+        }]);
+      } else {
+        children.push(['p', 'Malformed layout data.']);
+      }
+      if (i < this.splits.length - 1) {
+        children.push(['io-layout-divider', {
+          orientation: this.orientation || 'horizontal',
+          index: i
+        }]);
+      }
+    }
+    this.template([children]);
+  }
+  // _onDividerMove(event) {
+  //   event.stopPropagation();
+  //
+  //   let pi = event.detail.index;
+  //   let ni = event.detail.index + 1;
+  //
+  //   let prev = this.splits[pi];
+  //   let next = this.splits[ni];
+  //
+  //   // TODO: better clipping and snapping
+  //   let dp = prev[2] === undefined ? undefined : (prev[2] + event.detail.movement);
+  //   let dn = next[2] === undefined ? undefined : (next[2] - event.detail.movement);
+  //
+  //   // console.log(dp, dn);
+  //   if ((dp !== undefined && dp >= 0) && (dn === undefined || dn >= 0)) {
+  //     this.splits[pi][2] = Math.max(0, dp);
+  //   }
+  //   if ((dn !== undefined && dn >= 0) && (dp === undefined || dp >= 0)) {
+  //     this.splits[ni][2] = Math.max(0, dn);
+  //   }
+  //
+  //   if (prev[2] === undefined && next[2] === undefined) {
+  //     let $blocks = [].slice.call(this.children).filter(element => element.localName !== 'layout-divider');
+  //     let dim = this.orientation === 'horizontal' ? 'width' : 'height';
+  //     let ci = Math.floor(this.splits.length / 2);
+  //     if (Math.abs(ci - pi) <= Math.abs(ci - ni)) {
+  //       for (let j = ni; j < this.splits.length; j++) {
+  //         this.splits[j][2] = parseInt($blocks[j].getBoundingClientRect()[dim]);
+  //       }
+  //     } else {
+  //       for (let j = pi; j >= 0; j--) {
+  //         this.splits[j][2] = parseInt($blocks[j].getBoundingClientRect()[dim]);
+  //       }
+  //     }
+  //   }
+  //
+  //
+  //   this.dispatchEvent('layout-changed', this.splits);
+  //   this.changed();
+  // }
+}
+
+IoLayoutSplits.Register();
+
+class IoLayout extends IoElement {
+  static get style() {
+    return html`<style>:host{flex: 1;display: flex;}</style>`;
+  }
+  static get properties() {
+    return {
+      layout: Object,
+      elements: Object,
+    };
+  }
+  changed() {
+    this.template([
+      ['io-layout-splits', {
+        elements: this.elements,
+        orientation: this.layout.orientation,
+        splits: this.layout.splits,
+      }],
+    ]);
+  }
+}
+
+IoLayout.Register();
+
 /**
  * marked - a markdown parser
  * Copyright (c) 2011-2018, Christopher Jeffrey. (MIT Licensed)
@@ -1850,74 +2325,7 @@ if (window.marked) window.marked.setOptions({sanitize: false});
 
 class IoMdView extends IoElement {
   static get style() {
-    return html`
-      <style>
-      :host {
-        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        letter-spacing: 0.04em;
-        font-weight: 300;
-        display: block;
-        padding: 0.5em 1em;
-        background: #fff;
-        box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.3),
-                    0 15px 20px 0 rgba(0, 0, 0, 0.1);
-        border-radius: var(--io-theme-border-radius);
-        overflow: hidden;
-      }
-      :host p {
-        line-height: 1.5em;
-      }
-      :host a {
-        font-weight: bold;
-        text-decoration: none;
-        color: var(--io-theme-link-color);
-      }
-      :host code {
-        background: rgba(0,0,0,0.05);
-        overflow: auto;
-        font-weight: bold;
-      }
-      :host code.language-html,
-      :host code.language-javascript {
-        padding: 1em;
-        display: block;
-      }
-      :host blockquote {
-        border: 1px solid rgba(0,0,0,0.25);
-        margin: 0.5em 1em;
-        padding: 0.5em 1em;
-      }
-      :host table  {
-        width: 100%;
-        border: 1px solid black;
-        border-collapse: collapse;
-      }
-      :host table td,
-      :host table tr,
-      :host table th {
-        border: 1px solid gray;
-        text-align: left;
-        padding: 0.25em;
-      }
-      :host .videocontainer {
-          width: 100%;
-          height: 0;
-          position: relative;
-          padding-bottom: 56.25%;
-      }
-      :host .videocontainer > iframe {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-      }
-      :host .publishdate {
-        text-align: right;
-        opacity: 0.5;
-      }
-      </style>
-    `;
+    return html`<style>:host {font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;letter-spacing: 0.04em;font-weight: 300;display: block;padding: 0.5em 1em;background: #fff;box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.3),0 15px 20px 0 rgba(0, 0, 0, 0.1);border-radius: var(--io-theme-border-radius);overflow: hidden;}:host p {line-height: 1.5em;}:host a {font-weight: bold;text-decoration: none;color: var(--io-theme-link-color);}:host code {background: rgba(0,0,0,0.05);overflow: auto;font-weight: bold;}:host code.language-html,:host code.language-javascript {padding: 1em;display: block;}:host blockquote {border: 1px solid rgba(0,0,0,0.25);margin: 0.5em 1em;padding: 0.5em 1em;}:host table{width: 100%;border: 1px solid black;border-collapse: collapse;}:host table td,:host table tr,:host table th {border: 1px solid gray;text-align: left;padding: 0.25em;}:host .videocontainer {width: 100%;height: 0;position: relative;padding-bottom: 56.25%;}:host .videocontainer > iframe {position: absolute;top: 0;left: 0;width: 100%;height: 100%;}:host .publishdate {text-align: right;opacity: 0.5;}</style>`;
   }
   static get properties() {
     return {
@@ -2438,7 +2846,7 @@ const range = document.createRange();
 
 class IoNumber extends IoElement {
   static get style() {
-    return html`<style>:host {overflow: hidden;text-overflow: ellipsis;white-space: nowrap;border: var(--io-theme-field-border);border-radius: var(--io-theme-border-radius);padding: var(--io-theme-padding);color: var(--io-theme-field-color);background: var(--io-theme-field-bg);}:host:focus {overflow: hidden;text-overflow: clip;outline: none;border: var(--io-theme-focus-border);background: var(--io-theme-focus-bg);}</style>`;
+    return html`<style>:host {display: inline-block;overflow: hidden;text-overflow: ellipsis;white-space: nowrap;border: var(--io-theme-field-border);border-radius: var(--io-theme-border-radius);padding: var(--io-theme-padding);color: var(--io-theme-field-color);background: var(--io-theme-field-bg);}:host:focus {overflow: hidden;text-overflow: clip;outline: none;border: var(--io-theme-focus-border);background: var(--io-theme-focus-bg);}</style>`;
   }
   static get properties() {
     return {
@@ -2625,6 +3033,7 @@ class IoTabs extends IoElement {
     const buttons = [];
     const hamburger = ['io-option', {
       hamburger: true,
+      title: 'select tab menu',
       value: this.bind('selected'),
       options: this.options
     }];
@@ -2796,7 +3205,7 @@ const range$1 = document.createRange();
 
 class IoString extends IoElement {
   static get style() {
-    return html`<style>:host {overflow: hidden;text-overflow: ellipsis;white-space: nowrap;border: var(--io-theme-field-border);border-radius: var(--io-theme-border-radius);padding: var(--io-theme-padding);color: var(--io-theme-field-color);background: var(--io-theme-field-bg);}:host:focus {overflow: hidden;text-overflow: clip;outline: none;border: var(--io-theme-focus-border);background: var(--io-theme-focus-bg);}</style>`;
+    return html`<style>:host {display: inline-block;overflow: hidden;text-overflow: ellipsis;white-space: nowrap;border: var(--io-theme-field-border);border-radius: var(--io-theme-border-radius);padding: var(--io-theme-padding);color: var(--io-theme-field-color);background: var(--io-theme-field-bg);}:host:focus {overflow: hidden;text-overflow: clip;outline: none;border: var(--io-theme-focus-border);background: var(--io-theme-focus-bg);}</style>`;
   }
   static get properties() {
     return {
@@ -2856,4 +3265,4 @@ IoTheme.Register();
  * @author arodic / https://github.com/arodic
  */
 
-export { IoNodeMixin, IoNode, IoElement, html, initStyle, Binding, NodeBindings, IoServiceLoader, IoStorage, nodes as storageNodes, IoArray, IoBoolean, IoButton, IoCanvas, IoCollapsable, IoElementCache, IoInspector, IoInspectorBreadcrumbs, IoInspectorLink, IoMdView, IoMenuItem, IoMenuLayer, IoMenuOptions, IoMenu, IoNumber, IoObject, IoOption, IoProperties, IoTabs, IoSelector, IoSlider, IoString, IoTheme };
+export { IoNodeMixin, IoNode, IoElement, html, Binding, NodeBindings, IoServiceLoader, IoStorage, nodes as storageNodes, IoArray, IoBoolean, IoButton, IoCanvas, IoCollapsable, IoElementCache, IoInspector, IoLayout, IoMdView, IoMenuItem, IoMenuLayer, IoMenuOptions, IoMenu, IoNumber, IoObject, IoOption, IoProperties, IoTabs, IoSelector, IoSlider, IoString, IoTheme };
