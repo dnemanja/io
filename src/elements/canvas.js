@@ -3,7 +3,8 @@
 import {html, IoElement} from "../core/element.js";
 
 const canvas = document.createElement('canvas');
-const gl = canvas.getContext('webgl', {antialias: true, premultipliedAlpha: false});
+const gl = canvas.getContext('webgl', {antialias: false, premultipliedAlpha: false});
+gl.imageSmoothingEnabled = false;
 
 gl.enable(gl.BLEND);
 gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -56,6 +57,7 @@ export class IoCanvas extends IoElement {
         left: 0px;
         touch-action: none;
         user-select: none;
+        image-rendering: pixelated;
       }
     </style>`;
   }
@@ -79,7 +81,7 @@ export class IoCanvas extends IoElement {
   constructor(props) {
     super(props);
 
-    let frag = 'precision mediump float;';
+    let frag = 'precision mediump float;\n';
 
     for (let prop in this.__properties) {
       let type = this.__properties[prop].type;
@@ -119,6 +121,7 @@ export class IoCanvas extends IoElement {
 
     this.template([['canvas', {id: 'canvas'}]]);
     this._context2d = this.$.canvas.getContext('2d');
+    this._context2d.imageSmoothingEnabled = false;
 
     this.render();
   }
@@ -126,10 +129,12 @@ export class IoCanvas extends IoElement {
     const rect = this.getBoundingClientRect();
     this.size[0] = rect.width;
     this.size[1] = rect.height;
-    this.render();
+    this.changed();
   }
   changed() {
-    this.render();
+    requestAnimationFrame(() => {
+      this.render();
+    });
   }
   render() {
     if (!this._shader) return;
