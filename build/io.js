@@ -1475,7 +1475,7 @@ IoArray.Register();
 
 class IoButton extends IoElement {
   static get style() {
-    return html`<style>:host {display: inline-block;cursor: pointer;white-space: nowrap;-webkit-tap-highlight-color: transparent;overflow: hidden;text-overflow: ellipsis;line-height: 1em;border: var(--io-theme-button-border);border-radius: var(--io-theme-border-radius);padding: var(--io-theme-padding);padding-left: calc(3 * var(--io-theme-padding));padding-right: calc(3 * var(--io-theme-padding));background: var(--io-theme-button-bg);transition: background-color 0.4s;color: var(--io-theme-color);user-select: none;}:host:focus {outline: none;background: var(--io-theme-focus-bg);}:host:hover {background: var(--io-theme-hover-bg);}:host[pressed] {background: var(--io-theme-active-bg);}:host > span {text-align: center;}</style>`;
+    return html`<style>:host {display: inline-block;cursor: pointer;white-space: nowrap;-webkit-tap-highlight-color: transparent;overflow: hidden;text-overflow: ellipsis;user-select: none;border: var(--io-theme-button-border);border-radius: var(--io-theme-border-radius);padding: var(--io-theme-padding);padding-left: calc(3 * var(--io-theme-padding));padding-right: calc(3 * var(--io-theme-padding));background: var(--io-theme-button-bg);color: var(--io-theme-color);transition: background-color 0.4s;}:host:focus {outline: none;background: var(--io-theme-focus-bg);border: var(--io-theme-focus-border);}:host:hover {background: var(--io-theme-hover-bg);}:host[pressed] {background: var(--io-theme-active-bg);}</style>`;
   }
   static get properties() {
     return {
@@ -1510,14 +1510,13 @@ class IoButton extends IoElement {
   }
   onClick() {
     this.pressed = false;
+    this.focus();
     if (this.action) this.action(this.value);
     this.dispatchEvent('io-button-clicked', {value: this.value, action: this.action});
   }
   changed() {
     this.title = this.label;
-    this.template([
-      ['span', this.label]
-    ]);
+    this.innerText = this.label;
   }
 }
 
@@ -1525,7 +1524,7 @@ IoButton.Register();
 
 class IoBoolean extends IoButton {
   static get style() {
-    return html`<style>:host {display: inline-block;background: none;}</style>`;
+    return html`<style>:host {border: var(--io-theme-field-border);color: var(--io-theme-field-color);background: var(--io-theme-field-bg);}</style>`;
   }
   static get properties() {
     return {
@@ -1539,7 +1538,7 @@ class IoBoolean extends IoButton {
   }
   constructor(props) {
     super(props);
-    this.action = this.toggle;
+    this.__properties.action.value = this.toggle;
   }
   toggle() {
     this.set('value', !this.value);
@@ -1722,7 +1721,7 @@ IoCanvas.Register();
 
 class IoCollapsable extends IoElement {
   static get style() {
-    return html`<style>:host {display: flex;flex-direction: column;border: var(--io-theme-frame-border);border-radius: var(--io-theme-border-radius);padding: var(--io-theme-padding);background: var(--io-theme-frame-bg);}:host > io-boolean {border: none;border-radius: 0;background: none;}:host > io-boolean:focus {border: none;}:host > io-boolean::before {content: '▸';display: inline-block;width: 0.65em;margin: 0 0.25em;}:host[expanded] > io-boolean{margin-bottom: var(--io-theme-padding);}:host[expanded] > io-boolean::before{content: '▾';}:host > .io-collapsable-content {display: block;border: var(--io-theme-content-border);border-radius: var(--io-theme-border-radius);padding: var(--io-theme-padding);background: var(--io-theme-content-bg);}</style>`;
+    return html`<style>:host {display: flex;flex-direction: column;border: var(--io-theme-frame-border);border-radius: var(--io-theme-border-radius);padding: var(--io-theme-padding);background: var(--io-theme-frame-bg);transition: background-color 0.4s;}:host:focus-within {outline: none;background: var(--io-theme-focus-bg);}:host > io-boolean {border: none;border-radius: 0;background: none;padding: 0;}:host > io-boolean:hover {background: inherit;}:host > io-boolean:focus {border: none;}:host > io-boolean::before {content: '▸';display: inline-block;width: 0.65em;margin: 0 0.25em;}:host:not([expanded]) > io-boolean {line-height: 1em;}:host[expanded] > io-boolean {/* margin-bottom: var(--io-theme-padding); */}:host[expanded] > io-boolean::before{content: '▾';}:host > .io-collapsable-content {display: block;overflow: auto;border: var(--io-theme-content-border);border-radius: var(--io-theme-border-radius);padding: var(--io-theme-padding);background: var(--io-theme-content-bg);}</style>`;
   }
   static get properties() {
     return {
@@ -1764,14 +1763,11 @@ class IoElementCache extends IoElement {
   }
   connectedCallback() {
     super.connectedCallback();
-    document.addEventListener('readystatechange', this.readystatechange);
+    document.addEventListener('readystatechange', this.precacheChanged);
   }
   disconnectedCallback() {
     super.disconnectedCallback();
-    document.removeEventListener('readystatechange', this.readystatechange);
-  }
-  readystatechange() {
-    this.precacheChanged();
+    document.removeEventListener('readystatechange', this.precacheChanged);
   }
   precacheChanged() {
     if (this.precache && document.readyState === 'complete') {
@@ -1779,8 +1775,9 @@ class IoElementCache extends IoElement {
       for (let i = 0; i < this.stagingElement.childNodes.length; i++) {
         this._cache[i] = this.stagingElement.childNodes[i];
       }
+      this.stagingElement.innerHTML = '';
+      this.changed();
     }
-    this.stagingElement.innerHTML = '';
   }
   dispose() {
     super.dispose();
@@ -1801,12 +1798,14 @@ class IoElementCache extends IoElement {
       this.innerHTML = '';
       this.appendChild(this._cache[this.selected]);
     } else {
-      if (this.cache) {
+      if (this.precache || this.cache) {
         this.innerHTML = '';
-        this.template([element], this.stagingElement);
-        this._cache[this.selected] = this.stagingElement.childNodes[0];
+        if (!this._cache[this.selected]) {
+          this.template([element], this.stagingElement);
+          this._cache[this.selected] = this.stagingElement.childNodes[0];
+          this.stagingElement.innerHTML = '';
+        }
         this.appendChild(this._cache[this.selected]);
-        this.stagingElement.innerHTML = '';
       } else {
         this.template([element]);
       }
@@ -2106,7 +2105,7 @@ IoInspectorBreadcrumbs.Register();
 
 class IoInspectorLink extends IoButton {
   static get style() {
-    return html`<style>:host {border: none;overflow: hidden;text-overflow: ellipsis;background: none;padding: 0;border: 1px solid transparent;color: var(--io-theme-link-color);padding: var(--io-theme-padding) !important;}:host:focus {outline: none;background: none;text-decoration: underline;}:host:hover {background: none;text-decoration: underline;}:host[pressed] {background: none;}</style>`;
+    return html`<style>:host {border: none;overflow: hidden;text-overflow: ellipsis;background: none;padding: 0;border: 1px solid transparent;color: var(--io-theme-link-color);padding: var(--io-theme-padding) !important;}:host:focus {outline: none;background: none;text-decoration: underline;}:host:hover {background: none;text-decoration: underline;}</style>`;
   }
   changed() {
     let name = this.value.constructor.name;
@@ -2125,7 +2124,7 @@ IoInspectorLink.Register();
 
 class IoLayoutDivider extends IoElement {
   static get style() {
-    return html`<style>:host {background: #333;color: #ccc;z-index: 1;display: flex;flex: none;border: 1px outset #666;}:host[orientation=horizontal] {cursor: col-resize;width: 4px;}:host[orientation=vertical] {cursor: row-resize;height: 4px;}:host > .app-divider {flex: 1;margin: -0.4em;display: flex;align-items: center;justify-content: center;}</style>`;
+    return html`<style>:host {background: #333;color: #ccc;z-index: 1;display: flex;flex: none;border: 1px outset #666;user-select: none;}:host[orientation=horizontal] {cursor: col-resize;width: 4px;}:host[orientation=vertical] {cursor: row-resize;height: 4px;}:host > .app-divider {flex: 1;margin: -0.4em;display: flex;align-items: center;justify-content: center;}</style>`;
   }
   static get properties() {
     return {
@@ -2202,7 +2201,7 @@ class IoLayout extends IoElement {
       const style = {
         'flex-basis': flexBasis ? flexBasis : 'auto',
         'flex-grow': flexBasis ? 0 : 1,
-        'flex-shrink': 1 // flexBasis ? 1 : 0
+        'flex-shrink': flexBasis ? 0 : 1,
       };
       if (split.tabs) {
         children.push(['io-tabbed-elements', {
@@ -2306,7 +2305,6 @@ class IoLayout extends IoElement {
         }
       }
     }
-
     this.queue('splits', this.splits, this.splits);
     this.queueDispatch();
   }
@@ -2410,14 +2408,14 @@ class IoMenuLayer extends IoElement {
   }
   runAction(option) {
     if (typeof option.action === 'function') {
-      option.action.apply(null, [option.value]);
       this.collapseAllGroups();
+      option.action.apply(null, [option.value]);
       // if (lastFocus) {
       //   lastFocus.focus();
       // }
     } else if (option.button) {
-      option.button.click(); // TODO: test
       this.collapseAllGroups();
+      option.button.click(); // TODO: test
       // if (lastFocus) {
       //   lastFocus.focus();
       // }
@@ -2846,7 +2844,7 @@ const range = document.createRange();
 
 class IoNumber extends IoElement {
   static get style() {
-    return html`<style>:host {display: inline-block;overflow: hidden;text-overflow: ellipsis;white-space: nowrap;border: var(--io-theme-field-border);border-radius: var(--io-theme-border-radius);padding: var(--io-theme-padding);color: var(--io-theme-field-color);background: var(--io-theme-field-bg);}:host:focus {overflow: hidden;text-overflow: clip;outline: none;border: var(--io-theme-focus-border);background: var(--io-theme-focus-bg);}</style>`;
+    return html`<style>:host {display: inline-block;overflow: hidden;text-overflow: ellipsis;white-space: nowrap;border: var(--io-theme-field-border);border-radius: var(--io-theme-border-radius);padding: var(--io-theme-padding);color: var(--io-theme-field-color);background: var(--io-theme-field-bg);transition: background-color 0.4s;}:host:focus {overflow: hidden;text-overflow: clip;outline: none;border: var(--io-theme-focus-border);background: var(--io-theme-focus-bg);}</style>`;
   }
   static get properties() {
     return {
@@ -2944,7 +2942,7 @@ IoObject.Register();
 
 class IoOption extends IoButton {
   static get style() {
-    return html`<style>:host {padding-left: calc(1.5 * var(--io-theme-padding));padding-right: calc(1.5 * var(--io-theme-padding));}</style>`;
+    return html`<style>:host {padding: var(--io-theme-padding) calc(1.5 * var(--io-theme-padding));line-height: 1em;}:host::before {content: '▾';padding-right: var(--io-theme-padding);}</style>`;
   }
   static get properties() {
     return {
@@ -2965,7 +2963,6 @@ class IoOption extends IoButton {
   onMenu(event) {
     this.$['menu'].expanded = false;
     this.set('value', event.detail.value);
-    if (this.action) this.action(this.value);
   }
   changed() {
     let label = this.value;
@@ -2979,7 +2976,7 @@ class IoOption extends IoButton {
       }
     }
     this.template([
-      ['span', this.label || '▾ ' + String(label)],
+      ['span', this.label || String(label)],
       ['io-menu', {
         id: 'menu',
         options: this.options,
@@ -3128,7 +3125,7 @@ const range$1 = document.createRange();
 
 class IoString extends IoElement {
   static get style() {
-    return html`<style>:host {display: inline-block;overflow: hidden;text-overflow: ellipsis;white-space: nowrap;border: var(--io-theme-field-border);border-radius: var(--io-theme-border-radius);padding: var(--io-theme-padding);color: var(--io-theme-field-color);background: var(--io-theme-field-bg);}:host:focus {overflow: hidden;text-overflow: clip;outline: none;border: var(--io-theme-focus-border);background: var(--io-theme-focus-bg);}</style>`;
+    return html`<style>:host {display: inline-block;overflow: hidden;text-overflow: ellipsis;white-space: nowrap;border: var(--io-theme-field-border);border-radius: var(--io-theme-border-radius);padding: var(--io-theme-padding);color: var(--io-theme-field-color);background: var(--io-theme-field-bg);transition: background-color 0.4s;}:host:focus {overflow: hidden;text-overflow: clip;outline: none;border: var(--io-theme-focus-border);background: var(--io-theme-focus-bg);}</style>`;
   }
   static get properties() {
     return {
@@ -3178,80 +3175,44 @@ class IoTabbedElements extends IoElement {
       :host {
         display: flex;
         flex-direction: column;
-        align-items: stretch;
-        position: relative;
         overflow: auto;
       }
       :host > io-tabs {
-        z-index: 2;
-        flex: 0 0 auto;
-        margin: 0 var(--io-theme-spacing);
-        margin-bottom: calc(-1.1 * var(--io-theme-border-width));
-      }
-      :host[editable] > .new-tab-selector {
-        position: absolute;
-        top: 0;
-        right: var(--io-theme-spacing);
-        border-bottom-left-radius: 0;
-        border-bottom-right-radius: 0;
         z-index: 1;
-        opacity: 0.4;
-      }
-      :host[editable] > io-tabs {
-        margin-right: calc(2.2em + var(--io-theme-spacing)) !important;
+        margin: 0 var(--io-theme-spacing);
+        margin-bottom: calc(-1 * var(--io-theme-border-width));
       }
       :host > io-element-cache {
         flex: 1 1 auto;
+        overflow: auto;
         padding: var(--io-theme-padding);
         border: var(--io-theme-content-border);
         border-radius: var(--io-theme-border-radius);
         background: var(--io-theme-content-bg);
-        overflow: auto;
+      }
+      :host > io-tabs {
+        flex-shrink: 0;
       }
     </style>`;
   }
   static get properties() {
     return {
       elements: Array,
-      filter: Array,
+      filter: null,
       selected: String,
       precache: false,
       cache: true,
-      editable: {
-        type: Boolean,
-        reflect: true
-      },
-      role: {
-        type: String,
-        reflect: false
-      }
+      editable: Boolean,
     };
   }
   changed() {
-    const _elements = this.elements.map(element => { return element[1].label; });
-    const _filter = this.filter.length ? this.filter : _elements;
-
-    // TODO: consider testing with large element collections and optimizing.
-    const options = [];
-    for (let i = 0; i < _elements.length; i++) {
-      const added = this.filter.indexOf(_elements[i]) !== -1;
-      options.push({
-        icon: added ? '⌦' : '·',
-        value: _elements[i],
-        action: added ? this._onRemoveTab : this._onAddTab,
-      });
-    }
-
     this.template([
-      this.editable ? ['io-option', {
-        className: 'new-tab-selector',
-        label: '🛠',
-        options: options,
-      }] : null,
       ['io-tabs', {
         id: 'tabs',
         selected: this.bind('selected'),
-        tabs: _filter,
+        elements: this.elements,
+        filter: this.filter,
+        editable: this.editable,
         role: 'navigation',
       }],
       ['io-element-cache', {
@@ -3263,38 +3224,20 @@ class IoTabbedElements extends IoElement {
       }],
     ]);
   }
-  _onAddTab(tabID) {
-    if (this.filter.indexOf(tabID) !== -1) {
-      this.filter.splice(this.filter.indexOf(tabID), 1);
-    }
-    this.filter.push(tabID);
-    this.selected = tabID;
-    this.$.tabs.resized();
-    this.changed();
-  }
-  _onRemoveTab(tabID) {
-    if (this.filter.indexOf(tabID) !== -1) {
-      this.filter.splice(this.filter.indexOf(tabID), 1);
-    }
-    if (this.filter.indexOf(this.selected) == -1) {
-      this.selected = this.filter[0];
-    }
-    this.$.tabs.resized();
-    this.$.tabs.changed();
-    this.changed();
-  }
 }
 
 IoTabbedElements.Register();
 
 class IoTabs extends IoElement {
   static get style() {
-    return html`<style>:host {display: flex;flex-direction: row;flex-wrap: nowrap;font-style: italic;overflow: hidden;flex: 0 1 auto;}:host > * {flex: 0 0 auto;margin-right: var(--io-theme-spacing);border-bottom-left-radius: 0;border-bottom-right-radius: 0;background-image: linear-gradient(0deg, rgba(0, 0, 0, 0.125), transparent 0.75em);}:host > *.io-selected {border-bottom-color: var(--io-theme-content-bg);background-image: none;}:host[overflow] > :nth-child(n+3) {visibility: hidden;}:host > io-option {font-style: normal;}:host > io-button {letter-spacing: 0.145em;font-weight: 500;}:host > io-button:not(.io-selected) {color: rgba(0, 0, 0, 0.5);}:host > io-button.io-selected {background: var(--io-theme-content-bg);font-weight: 600;letter-spacing: 0.11em;}</style>`;
+    return html`<style>:host {display: flex;flex-direction: row;flex-wrap: nowrap;overflow: hidden;flex: 0 1 auto;position: relative;}:host > * {flex: 0 0 auto;margin-right: var(--io-theme-spacing);border-bottom-left-radius: 0;border-bottom-right-radius: 0;background-image: linear-gradient(0deg, rgba(0, 0, 0, 0.125), transparent 0.75em);}:host > *.io-selected {border-bottom-color: var(--io-theme-content-bg);background-image: none;}:host[overflow] > :nth-child(n+3):not(.edit-option) {visibility: hidden;}:host > io-button {font-style: italic;}:host > io-button:focus {border: var(--io-theme-button-border);border-bottom-color: var(--io-theme-content-bg);}:host > io-button:not(.io-selected) {color: rgba(0, 0, 0, 0.5);}:host > io-button.io-selected {background: var(--io-theme-content-bg);font-weight: 600;}:host > .edit-spacer {flex: 0 0 3.5em;background: none;}:host > .edit-option {border: none;background: none;position: absolute;right: 0;}:host > .edit-option:not(:hover) {opacity: 0.3;}</style>`;
   }
   static get properties() {
     return {
-      tabs: Array,
+      elements: Array,
+      filter: null,
       selected: String,
+      editable: Boolean,
       overflow: {
         type: Boolean,
         reflect: true,
@@ -3305,35 +3248,89 @@ class IoTabs extends IoElement {
     this.selected = id;
   }
   resized() {
-    const rect = this.getBoundingClientRect();
-    const lastButton = this.children[this.children.length-1];
-    const rectButton = lastButton.getBoundingClientRect();
-    this.overflow = rect.right < rectButton.right;
+    let right = this.getBoundingClientRect().right;
+    const lastButton = this.children[this.children.length - 2];
+    if (this.overflow) {
+      const hamburgerButton = this.children[0];
+      const firstButton = this.children[1];
+      right += hamburgerButton.getBoundingClientRect().width + firstButton.getBoundingClientRect().width;
+    }
+    this.overflow = lastButton && right < lastButton.getBoundingClientRect().right;
   }
+  _onAddTab(tabID) {
+    if (this.filter.indexOf(tabID) !== -1) {
+      this.filter.splice(this.filter.indexOf(tabID), 1);
+    }
+    this.filter.push(tabID);
+    this.selected = tabID;
+    this.resized();
+    this.changed();
+  }
+  _onRemoveTab(tabID) {
+    if (this.filter.indexOf(tabID) !== -1) {
+      this.filter.splice(this.filter.indexOf(tabID), 1);
+    }
+    if (this.filter.indexOf(this.selected) == -1) {
+      this.selected = this.filter[0];
+    }
+    this.resized();
+    this.changed();
+    this.changed();
+  }
+
   changed() {
+
+    const _elements = this.elements.map(element => { return element[1].label; });
+    const _filter = this.filter ? this.filter : _elements;
+
+    // TODO: consider testing with large element collections and optimizing.
+    const options = [];
+    for (let i = 0; i < _elements.length; i++) {
+      const added = this.filter && this.filter.indexOf(_elements[i]) !== -1;
+      options.push({
+        icon: added ? '⌦' : '·',
+        value: _elements[i],
+        action: added ? this._onRemoveTab : this._onAddTab, // TODO: make toggle on options
+      });
+    }
+
     const buttons = [];
     let selectedButton;
-    for (let i = 0; i < this.tabs.length; i++) {
-      const selected = this.selected === this.tabs[i];
+    for (let i = 0; i < _filter.length; i++) {
+      const selected = this.selected === _filter[i];
       const button = ['io-button', {
-        label: this.tabs[i],
-        value: this.tabs[i],
+        label: _filter[i],
+        value: _filter[i],
         action: this.select,
         className: selected ? 'io-selected' : ''
       }];
       if (selected) selectedButton = button;
       buttons.push(button);
     }
-    const elements = [
-      this.overflow ? [['io-option', {
-        label: '☰',
+    const elements = [];
+    if (this.overflow) {
+      elements.push(['io-option', {
+        label: '🍔',
         title: 'select tab menu',
         value: this.bind('selected'),
-        options: this.tabs
-      }],
-      selectedButton] : null,
-      ...buttons
-    ];
+        options: _filter
+      }]);
+      if (selectedButton) {
+        elements.push(selectedButton);
+      }
+    }
+    elements.push(...buttons);
+
+    if (this.editable) {
+      elements.push(['div', {
+        className: 'edit-spacer'
+      }], ['io-option', {
+        className: 'edit-option',
+        label: '⚙️',
+        options: options,
+      }]);
+    }
+
     this.template(elements);
   }
 }
@@ -3342,7 +3339,7 @@ IoTabs.Register();
 
 class IoTheme extends IoElement {
   static get style() {
-    return html`<style>body {--bg: #eee;--radius: 5px 5px 5px 5px;--spacing: 3px;--padding: 3px;--border-radius: 4px;--border-width: 1px;--border: var(--border-width) solid rgba(128, 128, 128, 0.25);--color: #000;--number-color: rgb(28, 0, 207);--string-color: rgb(196, 26, 22);--boolean-color: rgb(170, 13, 145);--link-color: #06a;--focus-border: 1px solid #09d;--focus-bg: #def;--active-bg: #ef8;--hover-bg: #fff;--frame-border: 1px solid #aaa;--frame-bg: #ccc;--content-border: 1px solid #aaa;--content-bg: #eee;--button-border: 1px solid #999;--button-bg: #bbb;--field-border: 1px solid #ccc;--field-color: #333;--field-bg: white;--menu-border: 1px solid #999;--menu-bg: #bbb;--menu-shadow: 2px 3px 5px rgba(0,0,0,0.2);}@media (-webkit-min-device-pixel-ratio: 2) {body {--radius: 7px 7px 7px 7px;--spacing: 4px;--padding: 4px;--border-radius: 4px;}}</style>`;
+    return html`<style>body {--bg: #eee;--radius: 5px 5px 5px 5px;--spacing: 3px;--padding: 5px;--border-radius: 4px;--border-width: 1px;--border: var(--border-width) solid rgba(128, 128, 128, 0.25);--color: #000;--number-color: rgb(28, 0, 207);--string-color: rgb(196, 26, 22);--boolean-color: rgb(170, 13, 145);--link-color: #06a;--focus-border: 1px solid #09d;--focus-bg: #def;--active-bg: #ef8;--hover-bg: #fff;--frame-border: 1px solid #aaa;--frame-bg: #ccc;--content-border: 1px solid #aaa;--content-bg: #eee;--button-border: 1px solid #999;--button-bg: #bbb;--field-border: 1px solid #ccc;--field-color: #333;--field-bg: white;--menu-border: 1px solid #999;--menu-bg: #bbb;--menu-shadow: 2px 3px 5px rgba(0,0,0,0.2);}@media (-webkit-min-device-pixel-ratio: 2) {body {--radius: 7px 7px 7px 7px;--spacing: 4px;--padding: 4px;--border-radius: 4px;}}</style>`;
   }
 }
 
