@@ -186,9 +186,15 @@ class NodeQueue extends Array {
     if (this.length) {
       for (let j = 0; j < this.length; j += 2) {
         const prop = this[j];
-        const payload = {detail: this[j + 1]};
-        if (node[prop + 'Changed']) node[prop + 'Changed'](payload);
-        node.dispatchEvent(prop + '-changed', payload.detail);
+        const detail = this[j + 1];
+        const payload = {detail: detail};
+        if (typeof detail.value === 'object' && detail.value === detail.oldValue) {
+          if (node[prop + 'Mutated']) node[prop + 'Mutated'](payload);
+          node.dispatchEvent(prop + '-mutated', payload.detail);
+        } else {
+          if (node[prop + 'Changed']) node[prop + 'Changed'](payload);
+          node.dispatchEvent(prop + '-changed', payload.detail);
+        }
       }
       // TODO: Evaluate performance and consider refactoring.
       if (node.isNode && !node.isElement) {
@@ -1166,8 +1172,8 @@ function initStyle(prototypes) {
   }
 }
 
-if (!("serviceWorker" in navigator)) { console.error("No Service Worker support!"); }
-if (!("PushManager" in window)) { console.error("No Push API Support!"); }
+if (!("serviceWorker" in navigator)) { console.warn("No Service Worker support!"); }
+if (!("PushManager" in window)) { console.warn("No Push API Support!"); }
 
 class IoServiceLoader extends IoNode {
   static get properties() {
@@ -1181,7 +1187,7 @@ class IoServiceLoader extends IoNode {
   }
   constructor(props) {
     super(props);
-    this.init();
+    if ("serviceWorker" in navigator) this.init();
   }
   async init() {
     const serviceWorkerRegistration = await navigator.serviceWorker.register(this.path);
@@ -1274,7 +1280,11 @@ class IoStorageNode extends IoNode {
     const key = window.location.pathname !== '/' ? window.location.pathname + this.key : this.key;
     const localValue = localStorage.getItem(key);
     if (hashValue !== undefined) {
-      this.value = JSON.parse(hashValue);
+      try {
+        this.value = JSON.parse(hashValue);
+      } catch (e) {
+        this.value = hashValue;
+      }
     } else {
       if (localValue !== null && localValue !== undefined) {
         this.value = JSON.parse(localValue);
@@ -1740,7 +1750,7 @@ IoCollapsable.Register();
 class IoElementCache extends IoElement {
   static get properties() {
     return {
-      selected: Number,
+      selected: String,
       elements:  Array,
       precache: Boolean,
       cache: Boolean,
@@ -1779,60 +1789,32 @@ class IoElementCache extends IoElement {
     delete this._cache;
   }
   changed() {
-    if (!this.elements[this.selected]) return;
-    if ((this.precache || this.cache) && (this.elements[this.selected].cache !== false) && this._cache[this.selected]) {
+    const element = this.elements.find(element => {
+      return element[1].label == this.selected;
+    });
+
+    if (!element) {
+      this.template();
+      return;
+    }
+    if ((this.precache || this.cache) && (element.cache !== false) && this._cache[this.selected]) {
       this.innerHTML = '';
       this.appendChild(this._cache[this.selected]);
     } else {
       if (this.cache) {
         this.innerHTML = '';
-        this.template([this.elements[this.selected]], this.stagingElement);
+        this.template([element], this.stagingElement);
         this._cache[this.selected] = this.stagingElement.childNodes[0];
         this.appendChild(this._cache[this.selected]);
         this.stagingElement.innerHTML = '';
       } else {
-        this.template([this.elements[this.selected]]);
+        this.template([element]);
       }
     }
   }
 }
 
 IoElementCache.Register();
-
-class IoInspectorBreadcrumbs extends IoElement {
-  static get style() {
-    return html`<style>:host {display: flex;flex: 1 0;flex-direction: row;border: var(--io-theme-field-border);border-radius: var(--io-theme-border-radius);padding: var(--io-theme-padding);color: var(--io-theme-field-color);background: var(--io-theme-field-bg);}:host > io-inspector-link {border: none;overflow: hidden;text-overflow: ellipsis;background: none;padding: 0;padding: var(--io-theme-padding);}:host > io-inspector-link:first-of-type {color: var(--io-theme-color);overflow: visible;text-overflow: clip;margin-left: 0.5em;}:host > io-inspector-link:last-of-type {overflow: visible;text-overflow: clip;margin-right: 0.5em;}:host > io-inspector-link:not(:first-of-type):before {content: '>';margin: 0 0.5em;opacity: 0.25;}</style>`;
-  }
-  static get properties() {
-    return {
-      crumbs: Array,
-    };
-  }
-  changed() {
-    this.template([this.crumbs.map(i => ['io-inspector-link', {value: i}])]);
-  }
-}
-
-IoInspectorBreadcrumbs.Register();
-
-class IoInspectorLink extends IoButton {
-  static get style() {
-    return html`<style>:host {border: none;overflow: hidden;text-overflow: ellipsis;background: none;padding: 0;border: 1px solid transparent;color: var(--io-theme-link-color);padding: var(--io-theme-padding) !important;}:host:focus {outline: none;background: none;text-decoration: underline;}:host:hover {background: none;text-decoration: underline;}:host[pressed] {background: none;}</style>`;
-  }
-  changed() {
-    let name = this.value.constructor.name;
-    if (this.value.name) name += ' (' + this.value.name + ')';
-    else if (this.value.label) name += ' (' + this.value.label + ')';
-    else if (this.value.title) name += ' (' + this.value.title + ')';
-    else if (this.value.id) name += ' (' + this.value.id + ')';
-    this.title = name;
-    this.template([
-      ['span', name]
-    ]);
-  }
-}
-
-IoInspectorLink.Register();
 
 function isValueOfPropertyOf(prop, object) {
   for (let key in object) if (object[key] === prop) return key;
@@ -1841,7 +1823,71 @@ function isValueOfPropertyOf(prop, object) {
 
 class IoInspector extends IoElement {
   static get style() {
-    return html`<style>:host {display: flex;flex-direction: column;border: var(--io-theme-content-border);border-radius: var(--io-theme-border-radius);padding: var(--io-theme-padding);background: var(--io-theme-content-bg);}:host > io-inspector-breadcrumbs {margin: var(--io-theme-spacing);}:host > io-collapsable {margin: var(--io-theme-spacing);}:host > io-collapsable > div io-properties > .io-property {overflow: hidden;padding: var(--io-theme-padding);}:host > io-collapsable > div io-properties > .io-property:not(:last-of-type) {border-bottom: var(--io-theme-border);}:host > io-collapsable > div io-properties > .io-property > :nth-child(1) {overflow: hidden;text-overflow: ellipsis;text-align: right;flex: 0 1 8em;min-width: 3em;padding: var(--io-theme-padding);margin: calc(0.25 * var(--io-theme-spacing));}:host > io-collapsable > div io-properties > .io-property > :nth-child(2) {flex: 1 0 8em;white-space: nowrap;overflow: hidden;text-overflow: ellipsis;min-width: 2em;}/* :host > .io-property > io-object,:host > .io-property > io-object > io-boolean,:host > .io-property > io-object > io-properties {padding: 0 !important;border: none !important;background: none !important;} */:host div io-properties > .io-property > io-object,:host div io-properties > .io-property > io-number,:host div io-properties > .io-property > io-string,:host div io-properties > .io-property > io-boolean {border: 1px solid transparent;padding: var(--io-theme-padding) !important;}:host div io-properties > .io-property > io-boolean:not([value]) {opacity: 0.5;}:host div io-properties > .io-property > io-option {flex: 0 1 auto !important;padding: var(--io-theme-padding) !important;}:host div io-properties > .io-property > io-number,:host div io-properties > .io-property > io-string {border: var(--io-theme-field-border);color: var(--io-theme-field-color);background: var(--io-theme-field-bg);}:host io-properties > .io-property > io-properties {border: var(--io-theme-field-border);background: rgba(127, 127, 127, 0.125);}</style>`;
+    return html`<style>
+    :host {
+      display: flex;
+      flex-direction: column;
+      border: var(--io-theme-content-border);
+      border-radius: var(--io-theme-border-radius);
+      padding: var(--io-theme-padding);
+      background: var(--io-theme-content-bg);
+    }
+    :host > io-inspector-breadcrumbs {
+      margin: var(--io-theme-spacing);
+    }
+    :host > io-collapsable {
+      margin: var(--io-theme-spacing);
+    }
+    :host > io-collapsable > div io-properties > .io-property {
+      overflow: hidden;
+      padding: var(--io-theme-padding);
+    }
+    :host > io-collapsable > div io-properties > .io-property:not(:last-of-type) {
+      border-bottom: var(--io-theme-border);
+    }
+    :host > io-collapsable > div io-properties > .io-property > :nth-child(1) {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: right;
+      flex: 0 1 8em;
+      min-width: 3em;
+      padding: var(--io-theme-padding);
+      margin: calc(0.25 * var(--io-theme-spacing));
+    }
+    :host > io-collapsable > div io-properties > .io-property > :nth-child(2) {
+      flex: 1 0 8em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 2em;
+    }
+
+    :host div io-properties > .io-property > io-object,
+    :host div io-properties > .io-property > io-number,
+    :host div io-properties > .io-property > io-string,
+    :host div io-properties > .io-property > io-boolean {
+      border: 1px solid transparent;
+      padding: var(--io-theme-padding) !important;
+    }
+    :host div io-properties > .io-property > io-boolean:not([value]) {
+      opacity: 0.5;
+    }
+    :host div io-properties > .io-property > io-option {
+      flex: 0 1 auto !important;
+      padding: var(--io-theme-padding) !important;
+    }
+    :host div io-properties > .io-property > io-number,
+    :host div io-properties > .io-property > io-string {
+      border: var(--io-theme-field-border);
+      color: var(--io-theme-field-color);
+      background: var(--io-theme-field-bg);
+    }
+
+    :host io-properties > .io-property > io-properties {
+      border: var(--io-theme-field-border);
+      background: rgba(127, 127, 127, 0.125);
+    }
+    </style>`;
   }
   static get properties() {
     return {
@@ -2007,6 +2053,76 @@ IoInspector.RegisterConfig = function(config) {
   this.prototype.__config.registerConfig(config);
 };
 
+class IoInspectorBreadcrumbs extends IoElement {
+  static get style() {
+    return html`<style>
+      :host {
+        display: flex;
+        flex: 1 0;
+        flex-direction: row;
+        border: var(--io-theme-field-border);
+        border-radius: var(--io-theme-border-radius);
+        padding: var(--io-theme-padding);
+        color: var(--io-theme-field-color);
+        background: var(--io-theme-field-bg);
+      }
+      :host > io-inspector-link {
+        border: none;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        background: none;
+        padding: 0;
+        padding: var(--io-theme-padding);
+      }
+      :host > io-inspector-link:first-of-type {
+        color: var(--io-theme-color);
+        overflow: visible;
+        text-overflow: clip;
+        margin-left: 0.5em;
+      }
+      :host > io-inspector-link:last-of-type {
+        overflow: visible;
+        text-overflow: clip;
+        margin-right: 0.5em;
+      }
+      :host > io-inspector-link:not(:first-of-type):before {
+        content: '>';
+        margin: 0 0.5em;
+        opacity: 0.25;
+      }
+    </style>`;
+  }
+  static get properties() {
+    return {
+      crumbs: Array,
+    };
+  }
+  changed() {
+    this.template([this.crumbs.map(i => ['io-inspector-link', {value: i}])]);
+  }
+}
+
+IoInspectorBreadcrumbs.Register();
+
+class IoInspectorLink extends IoButton {
+  static get style() {
+    return html`<style>:host {border: none;overflow: hidden;text-overflow: ellipsis;background: none;padding: 0;border: 1px solid transparent;color: var(--io-theme-link-color);padding: var(--io-theme-padding) !important;}:host:focus {outline: none;background: none;text-decoration: underline;}:host:hover {background: none;text-decoration: underline;}:host[pressed] {background: none;}</style>`;
+  }
+  changed() {
+    let name = this.value.constructor.name;
+    if (this.value.name) name += ' (' + this.value.name + ')';
+    else if (this.value.label) name += ' (' + this.value.label + ')';
+    else if (this.value.title) name += ' (' + this.value.title + ')';
+    else if (this.value.id) name += ' (' + this.value.id + ')';
+    this.title = name;
+    this.template([
+      ['span', name]
+    ]);
+  }
+}
+
+IoInspectorLink.Register();
+
 class IoLayoutDivider extends IoElement {
   static get style() {
     return html`<style>:host {background: #333;color: #ccc;z-index: 1;display: flex;flex: none;border: 1px outset #666;}:host[orientation=horizontal] {cursor: col-resize;width: 4px;}:host[orientation=vertical] {cursor: row-resize;height: 4px;}:host > .app-divider {flex: 1;margin: -0.4em;display: flex;align-items: center;justify-content: center;}</style>`;
@@ -2023,16 +2139,18 @@ class IoLayoutDivider extends IoElement {
   }
   static get listeners() {
     return {
-      'pointer-move': '_onPointerMove'
+      'pointermove': '_onPointerMove'
     };
   }
   _onPointerMove(event) {
-    console.log(event);
-    // let rect = this.getBoundingClientRect();
-    // let pos = event.detail.pointer[0].position;
-    // let mov = this.orientation === 'horizontal' ? pos.x : pos.y;
-    // let dim = this.orientation === 'horizontal' ? 'width' : 'height';
-    // this.dispatchEvent('layout-divider-move', {movement: mov - rect[dim] / 2, index: this.index});
+    if (event.buttons) {
+      event.preventDefault();
+      this.setPointerCapture(event.pointerId);
+      this.dispatchEvent('io-layout-divider-move', {
+        movement: this.orientation === 'horizontal' ? event.movementX : event.movementY,
+        index: this.index
+      }, true);
+    }
   }
   changed() {
     this.template([
@@ -2043,149 +2161,96 @@ class IoLayoutDivider extends IoElement {
 
 IoLayoutDivider.Register();
 
-const _dragIcon = document.createElement('div');
-_dragIcon.style = `pointer-events: none; position: fixed; padding: 0.2em 1.6em; background: rgba(0,0,0,0.5); z-index:2147483647`;
-
-class IoLayoutTab extends IoElement {
-  static get properties() {
-    return {
-      element: Object,
-      tabID: String,
-      selected: {
-        type: Boolean,
-        reflect: true
-      },
-      pointermode: 'absolute'
-    };
-  }
-  static get listeners() {
-    return {
-      'io-pointer-end': '_onPointerEnd',
-      'io-pointer-move': '_onPointerMove'
-    };
-  }
-  changed() {
-    this.innerText = this.tabID;
-  }
-  _onPointerMove(event) {
-    let pointer = event.detail.pointer[0];
-    let dist = pointer.distance.length();
-    if (!this._dragging && dist > 16 && event.detail.path[0] === this) {
-      this._dragging = true;
-      this.appendChild(_dragIcon);
-      this.dispatchEvent('layout-tab-drag-start', {pointer: pointer, tab: this});
-    }
-    _dragIcon.innerText = this.tabID;
-    _dragIcon.style.left = pointer.position.x - 12 + 'px';
-    _dragIcon.style.top = pointer.position.y - 12 + 'px';
-    if (this._dragging) {
-      this.dispatchEvent('layout-tab-drag', {pointer: pointer, tab: this});
-    }
-  }
-  _onPointerEnd() {
-    if (this._dragging) {
-      this.removeChild(_dragIcon);
-      this._dragging = false;
-      this.dispatchEvent('layout-tab-drag-end', {tab: this});
-    } else {
-      this.dispatchEvent('layout-tab-select', {tabID: this.tabID});
-    }
-  }
-}
-
-IoLayoutTab.Register();
-
-class IoLayoutTabs extends IoElement {
+class IoLayout extends IoElement {
   static get style() {
-    return html`<style>:host {flex: none;display: flex;flex-direction: row;background: #bbb;line-height: 1em;overflow: hidden;}:host > io-selector {flex-grow: 1;/* flex-shrink: 1; *//* cursor: pointer; *//* padding: 0.2em 1.6em; *//* border-right: 1px solid #999; *//* overflow: hidden; *//* text-overflow: ellipsis; *//* white-space: nowrap; */}/* :host > io-layout-tab {flex-grow: 0;flex-shrink: 1;cursor: pointer;padding: 0.2em 1.6em;border-right: 1px solid #999;overflow: hidden;text-overflow: ellipsis;white-space: nowrap;}:host > io-layout-tab[selected] {background: #ccc;}:host > io-button {line-height: 1em;display: inline-block;padding: 0.05em 0.4em;margin-left: -1.5em;}:host > io-option {display: inline-block;padding: 0.2em 0.6em;}:host > io-option,:host > io-button {opacity: 0.2;}:host > io-option:hover,:host > io-button:hover {opacity: 1;} */</style>`;
+    return html`<style>:host {flex: 1;display: flex;overflow: hidden;}:host[orientation=horizontal] {flex-direction: row;}:host[orientation=vertical] {flex-direction: column;}:host > io-tabbed-elements {margin-top: var(--io-theme-spacing);}</style>`;
   }
   static get properties() {
     return {
-      elements: Object,
-      tabs: Array,
-      selected: Number
-    };
-  }
-  changed() {
-    // let tabs = [];
-    // for (let i = 0; i < this.tabs.length; i++) {
-    //   tabs.push(['io-layout-tab', {
-    //     element: this.elements[this.selected],
-    //     tabID: this.tabs[i],
-    //     selected: this.selected === i}]);
-    //   tabs.push(['io-button', {
-    //     label: '⨯',
-    //     action: this._onRemove,
-    //     value: i}]);
-    // }
-    // tabs.push(
-    //   ['io-option', {
-    //     value: '+',
-    //     // TODO: optimize - this runs on resize etc.
-    //     options: Object.entries(this.elements).map((entry) => ({value: entry[0]})),
-    //     action: this._onAddTab
-    //   }]
-    // );
-    // this.template([tabs]);
-
-    let tabs = [];
-    for (let i = 0; i < this.tabs.length; i++) {
-      tabs.push(this.elements[this.tabs[i]]);
-    }
-    this.template([
-      ['io-selector', {
-        elements: tabs,
-        selected: this.selected || 0,
-      }]
-    ]);
-  }
-  // _onRemove(index) {
-  //   this.dispatchEvent('layout-tabs-remove', {tabID: this.tabs[index]});
-  // }
-  // _onAddTab(tabID) {
-  //   this.dispatchEvent('layout-tabs-add', {tabID: tabID, index: this.tabs.length});
-  // }
-}
-
-IoLayoutTabs.Register();
-
-class IoLayoutSplits extends IoElement {
-  static get style() {
-    return html`<style>:host{flex: 1;display: flex;overflow: hidden;}:host[orientation=horizontal] {flex-direction: row;}:host[orientation=vertical] {flex-direction: column;}</style>`;
-  }
-  static get properties() {
-    return {
-      elements: Object,
-      splits: Object,
+      elements: Array,
+      splits: Array,
+      editable: true,
       orientation: {
         value: 'horizontal',
         reflect: true
       }
     };
   }
-  // static get listeners() {
-  //   return {
-  //     'layout-divider-move': '_onDividerMove',
-  //     'layout-changed': '_onAppBlockChanged'
-  //   };
-  // }
-  // _onAppBlockChanged(event) {
-  //   for (let i = this.splits.length; i--;) {
-  //     if (this.splits[i][1].tabs == event.detail.tabs) {
-  //       this.splits[i][1].selected = event.detail.selected;
-  //       // if (event.detail.tabs.length === 0) {
-  //       //   this.splits.splice(i, 1);
-  //       //   console.log(event.detail.tabs);
-  //       // }
-  //     }
-  //   }
-  //   this.changed();
+  static get listeners() {
+    return {
+      'io-layout-divider-move': '_onDividerMove',
+      // 'layout-changed': '_onAppBlockChanged'
+    };
+  }
+  splitsMutated() {
+    const $blocks = [].slice.call(this.children).filter(element => element.localName !== 'io-layout-divider');
+    for (let i = 0; i < $blocks.length; i++) {
+      if ($blocks[i].selected) {
+        this.splits[i].selected = $blocks[i].selected;
+      }
+    }
+  }
+  changed() {
+    // let dim = this.orientation === 'horizontal' ? 'width' : 'height';
+    // let SPLIT_SIZE = 5;
+    // let rectSize = this.getBoundingClientRect()[dim];
+    // let maxFlex = rectSize - (this.splits.length - 1) * SPLIT_SIZE;
+    let children = [];
+    for (let i = 0; i < this.splits.length; i++) {
+      const split = this.splits[i];
+      const flexBasis = split.size !== undefined ? split.size + 'px' : null;
+      const style = {
+        'flex-basis': flexBasis ? flexBasis : 'auto',
+        'flex-grow': flexBasis ? 0 : 1,
+        'flex-shrink': 1 // flexBasis ? 1 : 0
+      };
+      if (split.tabs) {
+        children.push(['io-tabbed-elements', {
+          elements: this.elements,
+          filter: split.tabs,
+          selected: split.selected,
+          editable: this.editable,
+          style: style,
+          'on-selected-changed': this.splitsMutated
+        }]);
+        // children.push(['div', {style: style}, ' ' + split.size]);
+      } else if (split.splits) {
+        children.push(['io-layout', {
+          elements: this.elements,
+          splits: split.splits,
+          orientation: split.orientation,
+          editable: this.editable,
+          style: style,
+        }]);
+      } else {
+        // TODO: Improve data validation.
+        children.push(['p', 'Malformed layout data.']);
+      }
+      if (i < this.splits.length - 1) {
+        children.push(['io-layout-divider', {
+          orientation: this.orientation || 'horizontal',
+          index: i
+        }]);
+      }
+    }
+    this.template([children]);
+  }
+  // splitsChanged(event) {
+  //   // for (let i = this.splits.length; i--;) {
+  //   //   if (this.splits[i][1].tabs == event.detail.tabs) {
+  //   //     this.splits[i][1].selected = event.detail.selected;
+  //   //     // if (event.detail.tabs.length === 0) {
+  //   //     //   this.splits.splice(i, 1);
+  //   //     //   console.log(event.detail.tabs);
+  //   //     // }
+  //   //   }
+  //   // }
   // }
   // addSplit(elementID, srcBlock, target) {
   //   let hor = this.orientation === 'horizontal';
   //   let ver = this.orientation === 'vertical';
   //
-  //   let $blocks = [].slice.call(this.children).filter(element => element.localName !== 'io-layout-divider');
+  //   const $blocks = [].slice.call(this.children).filter(element => element.localName !== 'io-layout-divider');
   //   let spliceIndex = $blocks.indexOf(srcBlock);
   //   let divideIndex = -1;
   //
@@ -2205,109 +2270,45 @@ class IoLayoutSplits extends IoElement {
   //   }
   //   this.changed();
   // }
-  changed() {
-    // let dim = this.orientation === 'horizontal' ? 'width' : 'height';
-    // let SPLIT_SIZE = 5;
-    // let rectSize = this.getBoundingClientRect()[dim];
-    // let maxFlex = rectSize - (this.splits.length - 1) * SPLIT_SIZE;
+  _onDividerMove(event) {
+    event.stopPropagation();
+    let pi = event.detail.index;
+    let ni = event.detail.index + 1;
 
-    let children = [];
-    for (let i = 0; i < this.splits.length; i++) {
-      const split = this.splits[i];
-      const flexBasis = split.size !== undefined ? split.size + 'px' : null;
-      const style = {
-        'flex-basis': flexBasis ? flexBasis : 'auto',
-        'flex-grow': flexBasis ? 0 : 1,
-        'flex-shrink': 1 // flexBasis ? 1 : 0
-      };
-      if (split.tabs) {
-        children.push(['io-layout-tabs', {
-          elements: this.elements,
-          tabs: split.tabs,
-          selected: split.selected,
-          style: style,
-        }]);
-      } else if (split.splits) {
-        children.push(['io-layout-splits', {
-          elements: this.elements,
-          splits: split.splits,
-          orientation: split.orientation,
-          style: style,
-        }]);
+    let prev = this.splits[pi];
+    let next = this.splits[ni];
+
+    // TODO: better clipping and snapping
+    let dp = prev.size === undefined ? undefined : (prev.size + event.detail.movement);
+    let dn = next.size === undefined ? undefined : (next.size - event.detail.movement);
+
+    // console.log(dp, dn);
+    if ((dp !== undefined && dp >= 0) && (dn === undefined || dn >= 0)) {
+      this.splits[pi].size = Math.max(0, dp);
+    }
+    if ((dn !== undefined && dn >= 0) && (dp === undefined || dp >= 0)) {
+      this.splits[ni].size = Math.max(0, dn);
+    }
+
+    // TODO improve UX to work as expected in all edge cases.
+
+    if (prev.size === undefined && next.size === undefined) {
+      const $blocks = [].slice.call(this.children).filter(element => element.localName !== 'io-layout-divider');
+      let dim = this.orientation === 'horizontal' ? 'width' : 'height';
+      let ci = Math.floor(this.splits.length / 2);
+      if (Math.abs(ci - pi) <= Math.abs(ci - ni)) {
+        for (let j = ni; j < this.splits.length; j++) {
+          this.splits[j].size = parseInt($blocks[j].getBoundingClientRect()[dim]);
+        }
       } else {
-        children.push(['p', 'Malformed layout data.']);
-      }
-      if (i < this.splits.length - 1) {
-        children.push(['io-layout-divider', {
-          orientation: this.orientation || 'horizontal',
-          index: i
-        }]);
+        for (let j = pi; j >= 0; j--) {
+          this.splits[j].size = parseInt($blocks[j].getBoundingClientRect()[dim]);
+        }
       }
     }
-    this.template([children]);
-  }
-  // _onDividerMove(event) {
-  //   event.stopPropagation();
-  //
-  //   let pi = event.detail.index;
-  //   let ni = event.detail.index + 1;
-  //
-  //   let prev = this.splits[pi];
-  //   let next = this.splits[ni];
-  //
-  //   // TODO: better clipping and snapping
-  //   let dp = prev[2] === undefined ? undefined : (prev[2] + event.detail.movement);
-  //   let dn = next[2] === undefined ? undefined : (next[2] - event.detail.movement);
-  //
-  //   // console.log(dp, dn);
-  //   if ((dp !== undefined && dp >= 0) && (dn === undefined || dn >= 0)) {
-  //     this.splits[pi][2] = Math.max(0, dp);
-  //   }
-  //   if ((dn !== undefined && dn >= 0) && (dp === undefined || dp >= 0)) {
-  //     this.splits[ni][2] = Math.max(0, dn);
-  //   }
-  //
-  //   if (prev[2] === undefined && next[2] === undefined) {
-  //     let $blocks = [].slice.call(this.children).filter(element => element.localName !== 'layout-divider');
-  //     let dim = this.orientation === 'horizontal' ? 'width' : 'height';
-  //     let ci = Math.floor(this.splits.length / 2);
-  //     if (Math.abs(ci - pi) <= Math.abs(ci - ni)) {
-  //       for (let j = ni; j < this.splits.length; j++) {
-  //         this.splits[j][2] = parseInt($blocks[j].getBoundingClientRect()[dim]);
-  //       }
-  //     } else {
-  //       for (let j = pi; j >= 0; j--) {
-  //         this.splits[j][2] = parseInt($blocks[j].getBoundingClientRect()[dim]);
-  //       }
-  //     }
-  //   }
-  //
-  //
-  //   this.dispatchEvent('layout-changed', this.splits);
-  //   this.changed();
-  // }
-}
 
-IoLayoutSplits.Register();
-
-class IoLayout extends IoElement {
-  static get style() {
-    return html`<style>:host{flex: 1;display: flex;}</style>`;
-  }
-  static get properties() {
-    return {
-      layout: Object,
-      elements: Object,
-    };
-  }
-  changed() {
-    this.template([
-      ['io-layout-splits', {
-        elements: this.elements,
-        orientation: this.layout.orientation,
-        splits: this.layout.splits,
-      }],
-    ]);
+    this.queue('splits', this.splits, this.splits);
+    this.queueDispatch();
   }
 }
 
@@ -2324,7 +2325,7 @@ if (window.marked) window.marked.setOptions({sanitize: false});
 
 class IoMdView extends IoElement {
   static get style() {
-    return html`<style>:host {font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;letter-spacing: 0.04em;font-weight: 300;display: block;padding: 0.5em 1em;background: #fff;box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.3),0 15px 20px 0 rgba(0, 0, 0, 0.1);border-radius: var(--io-theme-border-radius);overflow: hidden;}:host p {line-height: 1.5em;}:host a {font-weight: bold;text-decoration: none;color: var(--io-theme-link-color);}:host code {background: rgba(0,0,0,0.05);overflow: auto;font-weight: bold;}:host code.language-html,:host code.language-javascript {padding: 1em;display: block;}:host blockquote {border: 1px solid rgba(0,0,0,0.25);margin: 0.5em 1em;padding: 0.5em 1em;}:host table{width: 100%;border: 1px solid black;border-collapse: collapse;}:host table td,:host table tr,:host table th {border: 1px solid gray;text-align: left;padding: 0.25em;}:host .videocontainer {width: 100%;height: 0;position: relative;padding-bottom: 56.25%;}:host .videocontainer > iframe {position: absolute;top: 0;left: 0;width: 100%;height: 100%;}:host .publishdate {text-align: right;opacity: 0.5;}</style>`;
+    return html`<style>:host {font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;letter-spacing: 0.04em;font-weight: 300;display: block;padding: 0.5em 1em;background: #fff;box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.3),0 15px 20px 0 rgba(0, 0, 0, 0.1);border-radius: var(--io-theme-border-radius);overflow: hidden;}:host p {line-height: 1.5em;}:host a {font-weight: bold;text-decoration: none;color: var(--io-theme-link-color);}:host code {background: rgba(0,0,0,0.05);overflow: auto;font-weight: bold;}:host code.language-html,:host code.language-javascript {padding: 1em;display: block;}:host blockquote {border: 1px solid rgba(0,0,0,0.25);margin: 0.5em 1em;padding: 0.5em 1em;}:host table{width: 100%;border: 1px solid black;border-collapse: collapse;}:host table td,:host table tr,:host table th {border: 1px solid gray;text-align: left;padding: 0.25em;}:host .videocontainer {width: 100%;height: 0;position: relative;padding-bottom: 56.25%;}:host .videocontainer > iframe {position: absolute;top: 0;left: 0;width: 100%;height: 100%;}</style>`;
   }
   static get properties() {
     return {
@@ -2943,15 +2944,12 @@ IoObject.Register();
 
 class IoOption extends IoButton {
   static get style() {
-    return html`<style>:host:not([hamburger])::after {width: 0.65em;margin-left: 0.25em;content: '▾';}</style>`;
+    return html`<style>:host {padding-left: calc(1.5 * var(--io-theme-padding));padding-right: calc(1.5 * var(--io-theme-padding));}</style>`;
   }
   static get properties() {
     return {
       options: Array,
-      hamburger: {
-        type: Boolean,
-        reflect: true,
-      },
+      label: '',
     };
   }
   static get listeners() {
@@ -2981,7 +2979,7 @@ class IoOption extends IoButton {
       }
     }
     this.template([
-      ['span', this.hamburger ? '☰' : String(label)],
+      ['span', this.label || '▾ ' + String(label)],
       ['io-menu', {
         id: 'menu',
         options: this.options,
@@ -2995,124 +2993,50 @@ class IoOption extends IoButton {
 
 IoOption.Register();
 
-// TODO: document and test
-
-class IoTabs extends IoElement {
+class IoSlider extends IoElement {
   static get style() {
-    return html`<style>:host {display: flex;flex-direction: row;flex-wrap: nowrap;font-style: italic;overflow: hidden;}:host > * {flex: 0 0 auto;display: none;}:host:not([vertical]) > * {margin-right: var(--io-theme-spacing);}:host[vertical] > * {margin-bottom: var(--io-theme-spacing);}:host[vertical] > io-option {padding: calc(var(--io-theme-padding) * 9) var(--io-theme-padding);}:host[vertical] {flex-direction: column;}:host[vertical][collapsed] > io-option {display: inherit;}:host[vertical]:not([collapsed]) > :nth-child(n+3) {display: inherit;}:host:not([vertical])[overflow] > :nth-child(-n+2) {display: inherit;}:host:not([vertical]):not([overflow]) > :nth-child(n+3) {display: inherit;}:host:not([vertical])[overflow] > :nth-child(n+3) {display: inherit;visibility: hidden;}:host:not([vertical]) > * {border-bottom-left-radius: 0;border-bottom-right-radius: 0;background-image: linear-gradient(0deg, rgba(0, 0, 0, 0.125), transparent 0.75em);}:host:not([vertical]) > *.io-selected {border-bottom-color: var(--io-theme-content-bg);background-image: none;}:host[vertical] > * {border-top-right-radius: 0;border-bottom-right-radius: 0;background-image: linear-gradient(270deg, rgba(0, 0, 0, 0.125), transparent 0.75em);}:host[vertical] > *.io-selected {border-right-color: var(--io-theme-content-bg);background-image: none;}:host > io-option {font-style: normal;}:host > io-button {letter-spacing: 0.145em;font-weight: 500;}:host > io-button:not(.io-selected) {color: rgba(0, 0, 0, 0.5);}:host > io-button.io-selected {background: var(--io-theme-content-bg);font-weight: 600;letter-spacing: 0.11em;}</style>`;
-  }
-  static get properties() {
-    return {
-      options: Array,
-      selected: null,
-      vertical: {
-        type: Boolean,
-        reflect: true,
-      },
-      overflow: {
-        type: Boolean,
-        reflect: true,
-      },
-      collapsed: {
-        type: Boolean,
-        reflect: true
-      },
-    };
-  }
-  select(id) {
-    this.selected = id;
-  }
-  resized() {
-    const rect = this.getBoundingClientRect();
-    const lastButton = this.children[this.children.length-1];
-    const rectButton = lastButton.getBoundingClientRect();
-    this.overflow = (!this.vertical && this.collapsed) || rect.right < rectButton.right;
-  }
-  changed() {
-    const buttons = [];
-    const hamburger = ['io-option', {
-      hamburger: true,
-      title: 'select tab menu',
-      value: this.bind('selected'),
-      options: this.options
-    }];
-    for (let i = 0; i < this.options.length; i++) {
-      buttons.push(['io-button', {
-        label: this.options[i].label,
-        value: this.options[i].value,
-        action: this.select,
-        className: this.selected === this.options[i].value ? 'io-selected' : ''
-      }]);
-    }
-    this.template([hamburger, buttons[this.selected] || ['span'], ...buttons]);
-  }
-}
-
-IoTabs.Register();
-
-class IoSelector extends IoElement {
-  static get style() {
-    return html`<style>:host {display: flex;flex-direction: column;align-items: stretch;position: relative;overflow: auto;}:host[vertical] {flex-direction: row;}:host > io-tabs {z-index: 2;flex: 0 0 auto;}:host:not([vertical]) > io-tabs {margin: 0 var(--io-theme-spacing);margin-bottom: calc(-1.1 * var(--io-theme-border-width));}:host[vertical] > io-tabs {flex: 0 0 auto;margin: var(--io-theme-spacing) 0;margin-right: calc(-1.1 * var(--io-theme-border-width));}:host[vertical] > io-tabs > io-button,:host[vertical] > io-tabs > io-button.io-selected {align-self: flex-end;color: var(--io-theme-link-color);border: none;background: none;background-image: none !important;}:host[vertical] > io-tabs > io-button:hover {text-decoration: underline;}:host > io-element-cache {flex: 1 1 auto;padding: var(--io-theme-padding);border: var(--io-theme-content-border);border-radius: var(--io-theme-border-radius);background: var(--io-theme-content-bg);overflow: auto;}</style>`;
-  }
-  static get properties() {
-    return {
-      elements: Array,
-      selected: Number,
-      precache: false,
-      cache: true,
-      collapseWidth: 500,
-      vertical: {
-        type: Boolean,
-        reflect: true
-      },
-      collapsed: {
-        type: Boolean,
-        reflect: true
-      },
-      role: {
-        type: String,
-        reflect: false
+    return html`<style>
+      :host {
+        display: flex;
+        flex-direction: row;
+        min-width: 12em;
       }
+      :host > io-number {
+        flex: 0 0 3.75em;
+      }
+      :host > io-slider-knob {
+        flex: 1 1 auto;
+        margin-left: var(--io-theme-spacing);
+        border-radius: 2px;
+      }
+    </style>`;
+  }
+  static get properties() {
+    return {
+      value: 0,
+      step: 0.001,
+      min: 0,
+      max: 1,
+      strict: true,
     };
   }
-  resized() {
-    const rect = this.getBoundingClientRect();
-    this.collapsed = this.vertical && rect.width < this.collapseWidth;
+  _onValueSet(event) {
+    this.dispatchEvent('value-set', event.detail, false);
+    this.value = event.detail.value;
   }
   changed() {
-    const options = [];
-    for (let i = 0; i < this.elements.length; i++) {
-      const props = this.elements[i][1] || {};
-      const label = props.label || props.title || props.name || this.elements[i][0] + '[' + i + ']';
-      options.push({
-        value: i,
-        label: label,
-      });
-    }
     this.template([
-      ['io-tabs', {
-        selected: this.bind('selected'),
-        vertical: this.vertical,
-        collapsed: this.collapsed,
-        options: options,
-        role: 'navigation',
-      }],
-      ['io-element-cache', {
-        elements: this.elements,
-        selected: this.selected,
-        cache: this.cache,
-        precache: this.precache,
-        role: this.role,
-      }],
+      ['io-number', {value: this.value, step: this.step, min: this.min, max: this.max, strict: this.strict, id: 'number', 'on-value-set': this._onValueSet}],
+      ['io-slider-knob', {value: this.value, step: this.step, minValue: this.min, maxValue: this.max, id: 'slider', 'on-value-set': this._onValueSet}]
     ]);
   }
 }
 
-IoSelector.Register();
+IoSlider.Register();
 
-class IoSlider extends IoElement {
+class IoSliderKnob extends IoCanvas {
   static get style() {
-    return html`<style>:host {display: flex;flex-direction: row;min-width: 12em;}:host > io-number {flex: 0 0 3.75em;}:host > io-slider-knob {flex: 1 1 auto;margin-left: var(--io-theme-spacing);border-radius: 2px;}</style>`;}static get properties() {return {value: 0,step: 0.001,min: 0,max: 1,strict: true,};}_onValueSet(event) {this.dispatchEvent('value-set', event.detail, false);this.value = event.detail.value;}changed() {this.template([['io-number', {value: this.value, step: this.step, min: this.min, max: this.max, strict: this.strict, id: 'number', 'on-value-set': this._onValueSet}],['io-slider-knob', {value: this.value, step: this.step, minValue: this.min, maxValue: this.max, id: 'slider', 'on-value-set': this._onValueSet}]]);}}IoSlider.Register();class IoSliderKnob extends IoCanvas {static get style() {return html`<style>:host {display: flex;cursor: ew-resize;touch-action: none;}:host > canvas {pointer-events: none;touch-action: none;}</style>`;
+    return html`<style>:host {display: flex;cursor: ew-resize;touch-action: none;}:host > canvas {pointer-events: none;touch-action: none;}</style>`;
   }
   static get properties() {
     return {
@@ -3248,9 +3172,177 @@ class IoString extends IoElement {
 
 IoString.Register();
 
+class IoTabbedElements extends IoElement {
+  static get style() {
+    return html`<style>
+      :host {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        position: relative;
+        overflow: auto;
+      }
+      :host > io-tabs {
+        z-index: 2;
+        flex: 0 0 auto;
+        margin: 0 var(--io-theme-spacing);
+        margin-bottom: calc(-1.1 * var(--io-theme-border-width));
+      }
+      :host[editable] > .new-tab-selector {
+        position: absolute;
+        top: 0;
+        right: var(--io-theme-spacing);
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+        z-index: 1;
+        opacity: 0.4;
+      }
+      :host[editable] > io-tabs {
+        margin-right: calc(2.2em + var(--io-theme-spacing)) !important;
+      }
+      :host > io-element-cache {
+        flex: 1 1 auto;
+        padding: var(--io-theme-padding);
+        border: var(--io-theme-content-border);
+        border-radius: var(--io-theme-border-radius);
+        background: var(--io-theme-content-bg);
+        overflow: auto;
+      }
+    </style>`;
+  }
+  static get properties() {
+    return {
+      elements: Array,
+      filter: Array,
+      selected: String,
+      precache: false,
+      cache: true,
+      editable: {
+        type: Boolean,
+        reflect: true
+      },
+      role: {
+        type: String,
+        reflect: false
+      }
+    };
+  }
+  changed() {
+    const _elements = this.elements.map(element => { return element[1].label; });
+    const _filter = this.filter.length ? this.filter : _elements;
+
+    // TODO: consider testing with large element collections and optimizing.
+    const options = [];
+    for (let i = 0; i < _elements.length; i++) {
+      const added = this.filter.indexOf(_elements[i]) !== -1;
+      options.push({
+        icon: added ? '⌦' : '·',
+        value: _elements[i],
+        action: added ? this._onRemoveTab : this._onAddTab,
+      });
+    }
+
+    this.template([
+      this.editable ? ['io-option', {
+        className: 'new-tab-selector',
+        label: '🛠',
+        options: options,
+      }] : null,
+      ['io-tabs', {
+        id: 'tabs',
+        selected: this.bind('selected'),
+        tabs: _filter,
+        role: 'navigation',
+      }],
+      ['io-element-cache', {
+        elements: this.elements,
+        selected: this.selected,
+        cache: this.cache,
+        precache: this.precache,
+        role: this.role,
+      }],
+    ]);
+  }
+  _onAddTab(tabID) {
+    if (this.filter.indexOf(tabID) !== -1) {
+      this.filter.splice(this.filter.indexOf(tabID), 1);
+    }
+    this.filter.push(tabID);
+    this.selected = tabID;
+    this.$.tabs.resized();
+    this.changed();
+  }
+  _onRemoveTab(tabID) {
+    if (this.filter.indexOf(tabID) !== -1) {
+      this.filter.splice(this.filter.indexOf(tabID), 1);
+    }
+    if (this.filter.indexOf(this.selected) == -1) {
+      this.selected = this.filter[0];
+    }
+    this.$.tabs.resized();
+    this.$.tabs.changed();
+    this.changed();
+  }
+}
+
+IoTabbedElements.Register();
+
+class IoTabs extends IoElement {
+  static get style() {
+    return html`<style>:host {display: flex;flex-direction: row;flex-wrap: nowrap;font-style: italic;overflow: hidden;flex: 0 1 auto;}:host > * {flex: 0 0 auto;margin-right: var(--io-theme-spacing);border-bottom-left-radius: 0;border-bottom-right-radius: 0;background-image: linear-gradient(0deg, rgba(0, 0, 0, 0.125), transparent 0.75em);}:host > *.io-selected {border-bottom-color: var(--io-theme-content-bg);background-image: none;}:host[overflow] > :nth-child(n+3) {visibility: hidden;}:host > io-option {font-style: normal;}:host > io-button {letter-spacing: 0.145em;font-weight: 500;}:host > io-button:not(.io-selected) {color: rgba(0, 0, 0, 0.5);}:host > io-button.io-selected {background: var(--io-theme-content-bg);font-weight: 600;letter-spacing: 0.11em;}</style>`;
+  }
+  static get properties() {
+    return {
+      tabs: Array,
+      selected: String,
+      overflow: {
+        type: Boolean,
+        reflect: true,
+      },
+    };
+  }
+  select(id) {
+    this.selected = id;
+  }
+  resized() {
+    const rect = this.getBoundingClientRect();
+    const lastButton = this.children[this.children.length-1];
+    const rectButton = lastButton.getBoundingClientRect();
+    this.overflow = rect.right < rectButton.right;
+  }
+  changed() {
+    const buttons = [];
+    let selectedButton;
+    for (let i = 0; i < this.tabs.length; i++) {
+      const selected = this.selected === this.tabs[i];
+      const button = ['io-button', {
+        label: this.tabs[i],
+        value: this.tabs[i],
+        action: this.select,
+        className: selected ? 'io-selected' : ''
+      }];
+      if (selected) selectedButton = button;
+      buttons.push(button);
+    }
+    const elements = [
+      this.overflow ? [['io-option', {
+        label: '☰',
+        title: 'select tab menu',
+        value: this.bind('selected'),
+        options: this.tabs
+      }],
+      selectedButton] : null,
+      ...buttons
+    ];
+    this.template(elements);
+  }
+}
+
+IoTabs.Register();
+
 class IoTheme extends IoElement {
   static get style() {
-    return html`<style>body {--bg: #eee;--radius: 5px 5px 5px 5px;--spacing: 3px;--padding: 3px;--border-radius: 2px;--border-width: 1px;--border: var(--border-width) solid rgba(128, 128, 128, 0.25);--color: #000;--number-color: rgb(28, 0, 207);--string-color: rgb(196, 26, 22);--boolean-color: rgb(170, 13, 145);--link-color: #06a;--focus-border: 1px solid #09d;--focus-bg: #def;--active-bg: #ef8;--hover-bg: #fff;--frame-border: 1px solid #aaa;--frame-bg: #ccc;--content-border: 1px solid #aaa;--content-bg: #eee;--button-border: 1px solid #999;--button-bg: #bbb;--field-border: 1px solid #ccc;--field-color: #333;--field-bg: white;--menu-border: 1px solid #999;--menu-bg: #bbb;--menu-shadow: 2px 3px 5px rgba(0,0,0,0.2);}@media (-webkit-min-device-pixel-ratio: 2) {body {--radius: 7px 7px 7px 7px;--spacing: 4px;--padding: 4px;--border-radius: 4px;}}</style>`;
+    return html`<style>body {--bg: #eee;--radius: 5px 5px 5px 5px;--spacing: 3px;--padding: 3px;--border-radius: 4px;--border-width: 1px;--border: var(--border-width) solid rgba(128, 128, 128, 0.25);--color: #000;--number-color: rgb(28, 0, 207);--string-color: rgb(196, 26, 22);--boolean-color: rgb(170, 13, 145);--link-color: #06a;--focus-border: 1px solid #09d;--focus-bg: #def;--active-bg: #ef8;--hover-bg: #fff;--frame-border: 1px solid #aaa;--frame-bg: #ccc;--content-border: 1px solid #aaa;--content-bg: #eee;--button-border: 1px solid #999;--button-bg: #bbb;--field-border: 1px solid #ccc;--field-color: #333;--field-bg: white;--menu-border: 1px solid #999;--menu-bg: #bbb;--menu-shadow: 2px 3px 5px rgba(0,0,0,0.2);}@media (-webkit-min-device-pixel-ratio: 2) {body {--radius: 7px 7px 7px 7px;--spacing: 4px;--padding: 4px;--border-radius: 4px;}}</style>`;
   }
 }
 
@@ -3264,4 +3356,4 @@ IoTheme.Register();
  * @author arodic / https://github.com/arodic
  */
 
-export { IoNodeMixin, IoNode, IoElement, html, Binding, NodeBindings, IoServiceLoader, IoStorage, nodes as storageNodes, IoArray, IoBoolean, IoButton, IoCanvas, IoCollapsable, IoElementCache, IoInspector, IoLayout, IoMdView, IoMenuItem, IoMenuLayer, IoMenuOptions, IoMenu, IoNumber, IoObject, IoOption, IoProperties, IoTabs, IoSelector, IoSlider, IoString, IoTheme };
+export { IoNodeMixin, IoNode, IoElement, html, Binding, NodeBindings, IoServiceLoader, IoStorage, nodes as storageNodes, IoArray, IoBoolean, IoButton, IoCanvas, IoCollapsable, IoElementCache, IoInspector, IoLayout, IoMdView, IoMenuItem, IoMenuLayer, IoMenuOptions, IoMenu, IoNumber, IoObject, IoOption, IoProperties, IoSlider, IoString, IoTabbedElements, IoTheme };

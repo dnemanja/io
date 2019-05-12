@@ -186,9 +186,15 @@ class NodeQueue extends Array {
     if (this.length) {
       for (let j = 0; j < this.length; j += 2) {
         const prop = this[j];
-        const payload = {detail: this[j + 1]};
-        if (node[prop + 'Changed']) node[prop + 'Changed'](payload);
-        node.dispatchEvent(prop + '-changed', payload.detail);
+        const detail = this[j + 1];
+        const payload = {detail: detail};
+        if (typeof detail.value === 'object' && detail.value === detail.oldValue) {
+          if (node[prop + 'Mutated']) node[prop + 'Mutated'](payload);
+          node.dispatchEvent(prop + '-mutated', payload.detail);
+        } else {
+          if (node[prop + 'Changed']) node[prop + 'Changed'](payload);
+          node.dispatchEvent(prop + '-changed', payload.detail);
+        }
       }
       // TODO: Evaluate performance and consider refactoring.
       if (node.isNode && !node.isElement) {
@@ -1166,8 +1172,8 @@ function initStyle(prototypes) {
   }
 }
 
-if (!("serviceWorker" in navigator)) { console.error("No Service Worker support!"); }
-if (!("PushManager" in window)) { console.error("No Push API Support!"); }
+if (!("serviceWorker" in navigator)) { console.warn("No Service Worker support!"); }
+if (!("PushManager" in window)) { console.warn("No Push API Support!"); }
 
 class IoServiceLoader extends IoNode {
   static get properties() {
@@ -1181,7 +1187,7 @@ class IoServiceLoader extends IoNode {
   }
   constructor(props) {
     super(props);
-    this.init();
+    if ("serviceWorker" in navigator) this.init();
   }
   async init() {
     const serviceWorkerRegistration = await navigator.serviceWorker.register(this.path);
@@ -1274,7 +1280,11 @@ class IoStorageNode extends IoNode {
     const key = window.location.pathname !== '/' ? window.location.pathname + this.key : this.key;
     const localValue = localStorage.getItem(key);
     if (hashValue !== undefined) {
-      this.value = JSON.parse(hashValue);
+      try {
+        this.value = JSON.parse(hashValue);
+      } catch (e) {
+        this.value = hashValue;
+      }
     } else {
       if (localValue !== null && localValue !== undefined) {
         this.value = JSON.parse(localValue);
