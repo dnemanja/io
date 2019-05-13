@@ -970,11 +970,14 @@ class IoElement extends IoNodeMixin(HTMLElement) {
     while (children.length > vChildren.length) {
       const child = children[children.length - 1];
       let nodes = Array.from(child.querySelectorAll('*'));
-      host.removeChild(child);
       for (let i = nodes.length; i--;) {
         if (nodes[i].dispose) nodes[i].dispose();
       }
       if (child.dispose) child.dispose();
+      // TODO: not sure why dispose needs to be called ahead of remove children
+      // Otherwise some bindings get disconnected.
+      // https://github.com/arodic/io/issues/1
+      host.removeChild(child);
     }
     // create new elements after existing
     if (children.length < vChildren.length) {
@@ -1673,6 +1676,7 @@ class IoCanvas extends IoElement {
   }
   render() {
     if (!this._shader) return;
+    if (!this.__properties.size) return;
 
     canvas.width = this.size[0];
     canvas.height = this.size[1];
@@ -2803,8 +2807,15 @@ class IoMenu extends IoElement {
     super.disconnectedCallback();
     this._parent.removeEventListener('pointerdown', this.onPointerdown);
     this._parent.removeEventListener('contextmenu', this.onContextmenu);
-    if (this.$['group']) IoMenuLayer.singleton.removeChild(this.$['group']);
     // TODO: unhack
+    // if (this.$['group']) IoMenuLayer.singleton.removeChild(this.$['group']);
+    // https://github.com/arodic/io/issues/1
+    for (let i = 0; i < IoMenuLayer.singleton.children.length; i++) {
+      if (IoMenuLayer.singleton.children[i].__parent === this) {
+        IoMenuLayer.singleton.removeChild(IoMenuLayer.singleton.children[i]);
+        return;
+      }
+    }
   }
   getBoundingClientRect() {
     return this._parent.getBoundingClientRect();
